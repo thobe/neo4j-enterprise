@@ -19,6 +19,7 @@
  */
 package org.neo4j.perftest.enterprise.ccheck;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,7 @@ import org.neo4j.perftest.enterprise.util.Conversion;
 import org.neo4j.perftest.enterprise.util.Parameters;
 import org.neo4j.perftest.enterprise.util.Setting;
 
+import static java.util.Arrays.asList;
 import static org.neo4j.perftest.enterprise.util.Configuration.SYSTEM_PROPERTIES;
 import static org.neo4j.perftest.enterprise.util.Configuration.settingsOf;
 import static org.neo4j.perftest.enterprise.util.Predicate.integerRange;
@@ -70,6 +72,20 @@ public class DataGenerator
                             result.append( (char) ('a' + RANDOM.nextInt( 'z' - 'a' )) );
                         }
                         return result.toString();
+                    }
+                },
+        BYTE_ARRAY
+                {
+                    @Override
+                    Object generate()
+                    {
+                        int length = 4 + RANDOM.nextInt( 60 );
+                        int[] array = new int[length];
+                        for ( int i = 0; i < length; i++ )
+                        {
+                            array[i] = RANDOM.nextInt( 256 );
+                        }
+                        return array;
                     }
                 };
 
@@ -113,17 +129,20 @@ public class DataGenerator
         }
     }
 
-    static final Setting<String> store_dir = stringSetting( "neo4j.store_dir" );
+    static final Setting<String> store_dir = stringSetting( "neo4j.store_dir", "target/generated-data/graph.db" );
     static final Setting<Boolean> report_progress = booleanSetting( "report_progress", false );
     static final Setting<Integer> node_count = adaptSetting(
-            restrictSetting( integerSetting( "node_count" ), integerRange( 0, Integer.MAX_VALUE ) ),
+            restrictSetting( integerSetting( "node_count", 100 ), integerRange( 0, Integer.MAX_VALUE ) ),
             Conversion.TO_INTEGER );
     static final Setting<List<RelationshipSpec>> relationships = listSetting(
-            adaptSetting( stringSetting( "relationships" ), RelationshipSpec.FROM_STRING ) );
+            adaptSetting( stringSetting( "relationships" ), RelationshipSpec.FROM_STRING ),
+            asList(new RelationshipSpec( "RELATED_TO", 2 )) );
     static final Setting<List<PropertyGenerator>> node_properties = listSetting(
-            enumSetting( PropertyGenerator.class, "node_properties" ) );
+            enumSetting( PropertyGenerator.class, "node_properties" ),
+            asList( PropertyGenerator.STRING, PropertyGenerator.BYTE_ARRAY ) );
     static final Setting<List<PropertyGenerator>> relationship_properties = listSetting(
-            enumSetting( PropertyGenerator.class, "relationship_properties" ) );
+            enumSetting( PropertyGenerator.class, "relationship_properties" ),
+            asList( PropertyGenerator.STRING ) );
 
     private final boolean reportProgress;
     private final int nodeCount;

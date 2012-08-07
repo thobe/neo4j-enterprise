@@ -45,8 +45,8 @@ import static org.neo4j.perftest.enterprise.util.Setting.stringSetting;
 
 public class ConsistencyPerformanceCheck
 {
-    private static final Setting<Boolean> generate_graph = booleanSetting( "generate_graph", false );
-    private static final Setting<String> report_file = stringSetting( "report_file" );
+    private static final Setting<Boolean> generate_graph = booleanSetting( "generate_graph", true );
+    private static final Setting<String> report_file = stringSetting( "report_file", "target/report.json" );
 
     /**
      * Sample execution:

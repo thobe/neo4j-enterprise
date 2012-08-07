@@ -19,20 +19,24 @@
  */
 package org.neo4j.perftest.enterprise.util;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-
 import static java.util.Collections.addAll;
 import static java.util.Collections.emptyList;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
 
 public abstract class Setting<T>
 {
     public static Setting<String> stringSetting( String name )
     {
-        return new Setting<String>( name, null )
+        return stringSetting( name, null );
+    }
+
+    public static Setting<String> stringSetting( String name, String defaultValue )
+    {
+        return new Setting<String>( name, defaultValue )
         {
             @Override
             String parse( String value )
@@ -42,9 +46,9 @@ public abstract class Setting<T>
         };
     }
 
-    public static Setting<Long> integerSetting( String name )
+    public static Setting<Long> integerSetting( String name, long defaultValue )
     {
-        return new Setting<Long>( name, null )
+        return new Setting<Long>( name, defaultValue )
         {
             @Override
             Long parse( String value )
@@ -110,9 +114,9 @@ public abstract class Setting<T>
         };
     }
 
-    public static <T> Setting<List<T>> listSetting( final Setting<T> singleSetting )
+    public static <T> Setting<List<T>> listSetting( final Setting<T> singleSetting, final List<T> defaultValue )
     {
-        return new Setting<List<T>>( singleSetting.name(), Collections.<T>emptyList() )
+        return new Setting<List<T>>( singleSetting.name(), defaultValue )
         {
             @Override
             List<T> parse( String value )
