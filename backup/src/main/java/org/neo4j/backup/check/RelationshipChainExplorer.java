@@ -17,11 +17,13 @@ public class RelationshipChainExplorer
         this.recordStore = recordStore;
     }
 
-    public RecordSet<RelationshipRecord> findInterestingRecordsAroundInconsistency( RelationshipRecord record )
+    public RecordSet<RelationshipRecord> exploreRelationshipRecordChainsToDepthTwo( RelationshipRecord record )
     {
         RecordSet<RelationshipRecord> records = new RecordSet<RelationshipRecord>();
-        records.addAll( expandChains( expandChainBothDirections( record, FIRST_PREV, FIRST_NEXT ), SECOND_PREV, SECOND_NEXT ) );
-        records.addAll( expandChains( expandChainBothDirections( record, SECOND_PREV, SECOND_NEXT ), FIRST_PREV, FIRST_NEXT ) );
+        records.addAll( expandChains(
+                expandChainInBothDirections( record, FIRST_PREV, FIRST_NEXT ), SECOND_PREV, SECOND_NEXT ) );
+        records.addAll( expandChains(
+                expandChainInBothDirections( record, SECOND_PREV, SECOND_NEXT ), FIRST_PREV, FIRST_NEXT ) );
         return records;
     }
 
@@ -32,26 +34,26 @@ public class RelationshipChainExplorer
         RecordSet<RelationshipRecord> chains = new RecordSet<RelationshipRecord>();
         for ( RelationshipRecord record : records )
         {
-            chains.addAll( expandChainBothDirections( record, prevField, nextField ) );
+            chains.addAll( expandChainInBothDirections( record, prevField, nextField ) );
         }
         return chains;
     }
 
-    private RecordSet<RelationshipRecord> expandChainBothDirections( RelationshipRecord record,
-                                                        ConsistencyCheck.RelationshipField prevField,
-                                                        ConsistencyCheck.RelationshipField nextField )
+    private RecordSet<RelationshipRecord> expandChainInBothDirections( RelationshipRecord record,
+                                                                       ConsistencyCheck.RelationshipField prevField,
+                                                                       ConsistencyCheck.RelationshipField nextField )
     {
         return expandChain( record, prevField ).union( expandChain( record, nextField ) );
     }
 
     private RecordSet<RelationshipRecord> expandChain( RelationshipRecord record,
-                                                        ConsistencyCheck.RelationshipField prevField )
+                                                        ConsistencyCheck.RelationshipField field )
     {
         RecordSet<RelationshipRecord> chain = new RecordSet<RelationshipRecord>();
         chain.add( record );
         RelationshipRecord currentRecord = record;
-        while ( prevField.relOf( currentRecord ) != -1) {
-            currentRecord = recordStore.getRecord( prevField.relOf( currentRecord ) );
+        while ( field.relOf( currentRecord ) != field.none) {
+            currentRecord = recordStore.getRecord( field.relOf( currentRecord ) );
             chain.add( currentRecord );
         }
         return chain;

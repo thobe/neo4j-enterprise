@@ -20,29 +20,34 @@ public class RelationshipChainExplorerTest
     public void shouldLoadAllConnectedRelationshipRecordsAndTheirFullChainsOfRelationshipRecords() throws Exception
     {
         // given
-        StoreAccess store = createStoreWithOneHighDegreeNodeAndSeveralDegreeTwoNodes();
+        int nDegreeTwoNodes = 10;
+        StoreAccess store = createStoreWithOneHighDegreeNodeAndSeveralDegreeTwoNodes( nDegreeTwoNodes );
         RecordStore<RelationshipRecord> relationshipStore = store.getRelationshipStore();
 
         // when
-        RecordSet<RelationshipRecord> records = new RelationshipChainExplorer(relationshipStore)
-                .findInterestingRecordsAroundInconsistency( relationshipStore.getRecord( 10 ) );
+        int relationshipIdInMiddleOfChain = 10;
+        RecordSet<RelationshipRecord> records = new RelationshipChainExplorer( relationshipStore )
+                .exploreRelationshipRecordChainsToDepthTwo(
+                        relationshipStore.getRecord( relationshipIdInMiddleOfChain ) );
 
         // then
-        assertEquals(20, records.size());
+        assertEquals( nDegreeTwoNodes * 2, records.size() );
     }
 
-    enum TestRelationshipType implements RelationshipType {
+    enum TestRelationshipType implements RelationshipType
+    {
         CONNECTED
     }
 
-    private StoreAccess createStoreWithOneHighDegreeNodeAndSeveralDegreeTwoNodes()
+    private StoreAccess createStoreWithOneHighDegreeNodeAndSeveralDegreeTwoNodes( int nDegreeTwoNodes )
     {
         File storeDirectory = TargetDirectory.forTest( getClass() ).graphDbDir( true );
         EmbeddedGraphDatabase database = new EmbeddedGraphDatabase( storeDirectory.getPath() );
         Transaction transaction = database.beginTx();
-        try {
+        try
+        {
             Node denseNode = database.createNode();
-            for (int i = 0; i < 10; i++)
+            for ( int i = 0; i < nDegreeTwoNodes; i++ )
             {
                 Node degreeTwoNode = database.createNode();
                 Node leafNode = database.createNode();
@@ -50,7 +55,9 @@ public class RelationshipChainExplorerTest
                 degreeTwoNode.createRelationshipTo( leafNode, TestRelationshipType.CONNECTED );
             }
             transaction.success();
-        } finally {
+        }
+        finally
+        {
             transaction.finish();
         }
         database.shutdown();
