@@ -977,7 +977,7 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
     }
 
     @SuppressWarnings( "boxing" )
-    private enum RelationshipField
+    protected enum RelationshipField
     {
         FIRST_NEXT( true, Record.NO_NEXT_RELATIONSHIP, SOURCE_NEXT_NOT_IN_USE, null, SOURCE_NEXT_DIFFERENT_CHAIN )
         {
