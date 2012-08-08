@@ -34,6 +34,27 @@ public class RelationshipChainExplorerTest
         assertEquals( nDegreeTwoNodes * 2, records.size() );
     }
 
+    @Test
+    public void shouldCopeWithAChainThatReferencesNotInUseZeroValueRecords() throws Exception
+    {
+        // given
+        int nDegreeTwoNodes = 10;
+        StoreAccess store = createStoreWithOneHighDegreeNodeAndSeveralDegreeTwoNodes( nDegreeTwoNodes );
+        RecordStore<RelationshipRecord> relationshipStore = store.getRelationshipStore();
+        int relationshipTowardsEndOfChain = 16;
+        relationshipStore.updateRecord( new RelationshipRecord( relationshipTowardsEndOfChain, 0, 0, 0 ) );
+
+        // when
+        int relationshipIdInMiddleOfChain = 10;
+        RecordSet<RelationshipRecord> records = new RelationshipChainExplorer( relationshipStore )
+                .exploreRelationshipRecordChainsToDepthTwo(
+                        relationshipStore.getRecord( relationshipIdInMiddleOfChain ) );
+
+        // then
+        int recordsInaccessibleBecauseOfBrokenChain = 3;
+        assertEquals( nDegreeTwoNodes * 2 - recordsInaccessibleBecauseOfBrokenChain, records.size() );
+    }
+
     enum TestRelationshipType implements RelationshipType
     {
         CONNECTED

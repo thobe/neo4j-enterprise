@@ -52,8 +52,8 @@ public class RelationshipChainExplorer
         RecordSet<RelationshipRecord> chain = new RecordSet<RelationshipRecord>();
         chain.add( record );
         RelationshipRecord currentRecord = record;
-        while ( field.relOf( currentRecord ) != field.none) {
-            currentRecord = recordStore.getRecord( field.relOf( currentRecord ) );
+        while ( currentRecord.inUse() && field.relOf( currentRecord ) != field.none) {
+            currentRecord = recordStore.forceGetRecord( field.relOf( currentRecord ) );
             chain.add( currentRecord );
         }
         return chain;
