@@ -28,6 +28,7 @@ import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.util.DefaultPrettyPrinter;
 import org.neo4j.backup.check.ConsistencyCheck;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
+import org.neo4j.helpers.Progress;
 import org.neo4j.helpers.ProgressIndicator;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
 import org.neo4j.kernel.configuration.Config;
@@ -82,14 +83,14 @@ public class ConsistencyPerformanceCheck
         new EmbeddedGraphDatabase( configuration.get( DataGenerator.store_dir ) ).shutdown();
 
         // run the consistency check
-        ProgressIndicator.Factory progress;
+        Progress.Factory progress;
         if ( configuration.get( DataGenerator.report_progress ) )
         {
-            progress = new ProgressIndicator.Textual( System.out );
+            progress = Progress.textual( System.out );
         }
         else
         {
-            progress = ProgressIndicator.Factory.NONE;
+            progress = Progress.Factory.NONE;
         }
         ConsistencyCheck.run( new TimingProgress( new JsonReportWriter( reportFile ), progress ),
                               configuration.get( DataGenerator.store_dir ),
@@ -101,6 +102,7 @@ public class ConsistencyPerformanceCheck
     {
         private final File target;
         private JsonGenerator json;
+        private boolean writeRecordsPerSecond = true;
 
         JsonReportWriter( File target )
         {
@@ -118,8 +120,7 @@ public class ConsistencyPerformanceCheck
             {
                 json.writeFieldName( "total" );
                 json.writeStartObject();
-                json.writeNumberField( "elementCount", totalElementCount );
-                json.writeNumberField( "time", nanosToMillis( totalTimeNanos ) );
+                emitTime( totalElementCount, totalTimeNanos );
                 json.writeEndObject();
             }
             json.writeFieldName( "phases" );
@@ -132,9 +133,19 @@ public class ConsistencyPerformanceCheck
             ensureOpen( true );
             json.writeStartObject();
             json.writeStringField( "name", phase );
-            json.writeNumberField( "elementCount", elementCount );
-            json.writeNumberField( "time", nanosToMillis( timeNanos ) );
+            emitTime( elementCount, timeNanos );
             json.writeEndObject();
+        }
+
+        private void emitTime( long elementCount, long timeNanos ) throws IOException
+        {
+            json.writeNumberField( "elementCount", elementCount );
+            double millis = nanosToMillis( timeNanos );
+            json.writeNumberField( "time", millis );
+            if ( writeRecordsPerSecond )
+            {
+                json.writeNumberField( "recordsPerSecond", (elementCount * 1000.0) / millis );
+            }
         }
 
         @Override

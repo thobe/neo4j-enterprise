@@ -298,11 +298,11 @@ class VerifyingTransactionInterceptor implements TransactionInterceptor
     private static <R extends AbstractBaseRecord> void logRecord( LineLogger log, RecordStore<? extends R> store,
             R record )
     {
-        DiffRecordStore<? extends R> diff = (DiffRecordStore<? extends R>) store;
+        DiffRecordStore<R> diff = (DiffRecordStore<R>) store;
         String prefix = "";
         if ( diff.isModified( record.getLongId() ) )
         {
-            log.logLine( "- " + diff.forceGetRaw( record.getLongId() ) );
+            log.logLine( "- " + diff.forceGetRaw( record ) );
             prefix = "+ ";
             record = store.forceGetRecord( record.getLongId() );
         }

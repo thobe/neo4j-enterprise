@@ -19,6 +19,7 @@
  */
 package org.neo4j.backup.check;
 
+import static java.util.concurrent.TimeUnit.DAYS;
 import static org.neo4j.backup.check.InconsistencyType.PropertyBlockInconsistency.BlockInconsistencyType.DYNAMIC_NOT_IN_USE;
 import static org.neo4j.backup.check.InconsistencyType.PropertyBlockInconsistency.BlockInconsistencyType.ILLEGAL_PROPERTY_TYPE;
 import static org.neo4j.backup.check.InconsistencyType.PropertyBlockInconsistency.BlockInconsistencyType.INVALID_PROPERTY_KEY;
@@ -78,11 +79,17 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.neo4j.backup.check.InconsistencyType.ReferenceInconsistency;
 import org.neo4j.graphdb.factory.GraphDatabaseSetting;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.Args;
+import org.neo4j.helpers.Exceptions;
+import org.neo4j.helpers.Progress;
 import org.neo4j.helpers.ProgressIndicator;
 import org.neo4j.kernel.DefaultFileSystemAbstraction;
 import org.neo4j.kernel.DefaultIdGeneratorFactory;
@@ -91,6 +98,7 @@ import org.neo4j.kernel.DefaultTxHook;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.configuration.ConfigurationDefaults;
+import org.neo4j.kernel.impl.cache.LruCache;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NeoStore;
@@ -193,7 +201,10 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
 
     private static void printUsage( String... msgLines )
     {
-        for ( String line : msgLines ) System.err.println( line );
+        for ( String line : msgLines )
+        {
+            System.err.println( line );
+        }
         System.err.println( Args.jarUsage( ConsistencyCheck.class, "[-propowner] <storedir>" ) );
         System.err.println( "WHERE:   <storedir>  is the path to the store to check" );
         System.err.println( "         -propowner  --  to verify that properties are owned only once" );
@@ -202,10 +213,10 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
 
     public static void run( String storeDir, Config config )
     {
-        run( new ProgressIndicator.Textual( System.err ), storeDir, config );
+        run( Progress.textual( System.err ), storeDir, config );
     }
 
-    public static void run( ProgressIndicator.Factory progressFactory, String storeDir, Config config )
+    public static void run( Progress.Factory progressFactory, String storeDir, Config config )
     {
         StoreFactory factory = new StoreFactory( config,
                                                  new DefaultIdGeneratorFactory(),
@@ -227,29 +238,18 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
 
     public static void run( StoreAccess stores, boolean propowner )
     {
-        run( new ProgressIndicator.Textual( System.err ), stores, propowner );
+        run( Progress.Factory.NONE, stores, propowner );
     }
 
-    public static void run( final ProgressIndicator.Factory progressFactory, StoreAccess stores, boolean propowner )
+    public static void run( final Progress.Factory progressFactory, StoreAccess stores, boolean propowner )
     {
         new ConsistencyCheck( stores, propowner )
         {
             @Override
-            ProgressIndicator progressInit()
+            Progress.MultiPartBuilder progressInit()
             {
-                System.err.println( "Checking consistency"
+                return progressFactory.multipleParts( "Checking consistency"
                                     + ( propowners() ? " (with property owner verification)" : "" ) + " on:" );
-                long total = 0;
-                for ( RecordStore<?> store : this )
-                {
-                    if ( store != null )
-                    {
-                        long highId = store.getHighId();
-                        System.err.println( "    " + highId + " records from " + store );
-                        total += highId;
-                    }
-                }
-                return progressFactory.newMultiProgressIndicator( total );
             }
 
             @Override
@@ -411,29 +411,65 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
     @SuppressWarnings( "unchecked" )
     public void run()
     {
-        ProgressIndicator progress = progressInit();
+        Progress.MultiPartBuilder progress = progressInit();
+        ExecutorService service = Executors.newFixedThreadPool( 8 );
 
-        applyFiltered( nodes, progress, RecordStore.IN_USE );
-        applyFiltered( rels, progress, RecordStore.IN_USE );
+        checkStore( service, nodes, progress );
+        checkStore( service, rels, progress );
+        // FIXME: propertyOwners can't be cleared when running in parallel
+        /*
         // free up some heap space that isn't needed anymore
-        if ( propertyOwners != null ) propertyOwners.clear();
-        applyFiltered( props, progress, RecordStore.IN_USE );
+        if ( propertyOwners != null )
+        {
+            propertyOwners.clear();
+        }
+        checkStore( service, props, progress );
         // free up some heap space that isn't needed anymore
-        if ( propertyOwners != null ) propertyOwners.clear();
-        applyFiltered( strings, progress, RecordStore.IN_USE );
-        applyFiltered( arrays, progress, RecordStore.IN_USE );
-        applyFiltered( relTypes, progress, RecordStore.IN_USE );
-        applyFiltered( propIndexes, progress, RecordStore.IN_USE );
-        applyFiltered( propKeys, progress, RecordStore.IN_USE );
-        applyFiltered( typeNames, progress, RecordStore.IN_USE );
+        if ( propertyOwners != null )
+        {
+            propertyOwners.clear();
+        }
+        */
+        checkStore( service, strings, progress );
+        checkStore( service, arrays, progress );
+        checkStore( service, relTypes, progress );
+        checkStore( service, propIndexes, progress );
+        checkStore( service, propKeys, progress );
+        checkStore( service, typeNames, progress );
 
-        if (progress != null) progress.done();
+        try
+        {
+            progress.complete().await( 365, DAYS );
+        }
+        catch ( Exception e )
+        {
+            throw Exceptions.launderedException( e );
+        }
+        service.shutdown();
         checkResult();
     }
 
-    ProgressIndicator progressInit()
+    private <R extends AbstractBaseRecord> void checkStore( ExecutorService executor,
+                                                           final RecordStore<R> store,
+                                                           Progress.MultiPartBuilder builder )
     {
-        return null;
+        String name = store.getStorageFileName();
+        final Progress progress = builder.progressForPart( name.substring( name.lastIndexOf( '/' ) + 1 ),
+                                                           store.getHighId() );
+        executor.submit( new Runnable()
+        {
+            @Override
+            @SuppressWarnings( "unchecked" )
+            public void run()
+            {
+                applyFiltered( store, progress, RecordStore.IN_USE );
+            }
+        } );
+    }
+
+    Progress.MultiPartBuilder progressInit()
+    {
+        return Progress.Factory.NONE.multipleParts( "Consistency check" );
     }
 
     /**
@@ -458,19 +494,28 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
     @Override
     public void processNode( RecordStore<NodeRecord> store, NodeRecord node )
     {
-        if ( checkNode( node ) ) brokenNodes++;
+        if ( checkNode( node ) )
+        {
+            brokenNodes++;
+        }
     }
 
     @Override
     public void processRelationship( RecordStore<RelationshipRecord> store, RelationshipRecord rel )
     {
-        if ( checkRelationship( rel ) ) brokenRels++;
+        if ( checkRelationship( rel ) )
+        {
+            brokenRels++;
+        }
     }
 
     @Override
     public void processProperty( RecordStore<PropertyRecord> store, PropertyRecord property )
     {
-        if ( checkProperty( property ) ) brokenProps++;
+        if ( checkProperty( property ) )
+        {
+            brokenProps++;
+        }
     }
 
     @Override
@@ -485,33 +530,49 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
     @Override
     public void processArray( RecordStore<DynamicRecord> store, DynamicRecord array )
     {
-        if ( checkDynamic( store, array ) ) brokenArrays++;
+        if ( checkDynamic( store, array ) )
+        {
+            brokenArrays++;
+        }
     }
 
     @Override
     public void processRelationshipType( RecordStore<RelationshipTypeRecord> store, RelationshipTypeRecord type )
     {
-        if ( checkType( type ) ) brokenTypes++;
+        if ( checkType( type ) )
+        {
+            brokenTypes++;
+        }
     }
 
     @Override
     public void processPropertyIndex( RecordStore<PropertyIndexRecord> store, PropertyIndexRecord index )
     {
-        if ( checkKey( index ) ) brokenKeys++;
+        if ( checkKey( index ) )
+        {
+            brokenKeys++;
+        }
     }
 
+    LruCache<Long,NodeRecord> nodeRecords = new LruCache<Long, NodeRecord>("NodeRecord",100000);
+    LruCache<Long,RelationshipRecord> relRecords = new LruCache<Long, RelationshipRecord>("RelRecord",100000);
+    LruCache<Long,PropertyRecord> propRecords = new LruCache<Long, PropertyRecord>("PropRecord",100000);
+    LruCache<Integer,RelationshipTypeRecord> relTypesRecords = new LruCache<Integer, RelationshipTypeRecord>("RelationshipTypeRecord",32000);
     private boolean checkNode( NodeRecord node )
     {
         boolean fail = false;
         if ( !node.inUse() )
         {
-            NodeRecord old = nodes.forceGetRaw( node.getId() );
+            NodeRecord old = nodes.forceGetRaw( node );
             if ( old.inUse() ) // Check that referenced records are also removed
             {
                 if ( !Record.NO_NEXT_RELATIONSHIP.value( old.getNextRel() ) )
                 { // NOTE: with reuse in the same tx this check is invalid
-                    RelationshipRecord rel = rels.forceGetRecord( old.getNextRel() );
-                    if ( rel.inUse() ) fail |= inconsistent( nodes, node, rels, rel, RELATIONSHIP_NOT_REMOVED_FOR_DELETED_NODE );
+                    RelationshipRecord rel = getRelationshipRecord( old.getNextRel() );
+                    if ( rel.inUse() )
+                    {
+                        fail |= inconsistent( nodes, node, rels, rel, RELATIONSHIP_NOT_REMOVED_FOR_DELETED_NODE );
+                    }
                 }
                 fail |= checkPropertyReference( node, nodes, new OwningNode( node.getId() ) );
             }
@@ -520,14 +581,30 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
         long relId = node.getNextRel();
         if ( !Record.NO_NEXT_RELATIONSHIP.value( relId ) )
         {
-            RelationshipRecord rel = rels.forceGetRecord( relId );
+            RelationshipRecord rel = getRelationshipRecord( relId );
             if ( !rel.inUse() )
+            {
                 fail |= inconsistent( nodes, node, rels, rel, RELATIONSHIP_NOT_IN_USE );
-            else if ( !( rel.getFirstNode() == node.getId() || rel.getSecondNode() == node.getId() ) )
+            }
+            else if ( !(rel.getFirstNode() == node.getId() || rel.getSecondNode() == node.getId()) )
+            {
                 fail |= inconsistent( nodes, node, rels, rel, RELATIONSHIP_FOR_OTHER_NODE );
+            }
         }
         fail |= checkPropertyReference( node, nodes, new OwningNode( node.getId() ) );
         return fail;
+    }
+
+    private NodeRecord getNodeRecord( long nodeId )
+    {
+        NodeRecord nodeRecord = nodeRecords.get( nodeId );
+        if ( nodeRecord != null )
+        {
+            return nodeRecord;
+        }
+        nodeRecord = nodes.forceGetRecord( nodeId );
+        nodeRecords.put( nodeId, nodeRecord );
+        return nodeRecord;
     }
 
     private <R extends PrimitiveRecord> boolean checkPropertyReference( R primitive, RecordStore<R> store, PropertyOwner owner )
@@ -535,27 +612,34 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
         boolean fail = false;
         if ( props != null )
         {
-            R old = store.forceGetRaw( primitive.getId() );
+            R old = store.forceGetRaw( primitive );
             if ( primitive.inUse() )
             {
-                if ( !Record.NO_NEXT_PROPERTY.value( primitive.getNextProp() ) )
+                long propId = primitive.getNextProp();
+                if ( !Record.NO_NEXT_PROPERTY.value(propId) )
                 {
-                    PropertyRecord prop = props.forceGetRecord( primitive.getNextProp() );
+                    PropertyRecord prop = getPropertyRecord(propId);
                     fail |= checkPropertyOwner( prop, owner );
                     if ( !prop.inUse() )
+                    {
                         fail |= inconsistent( store, primitive, props, prop, PROPERTY_NOT_IN_USE );
+                    }
                     else if ( owner.otherOwnerOf( prop ) != -1
-                              || ( owner.ownerOf( prop ) != -1 && owner.ownerOf( prop ) != primitive.getId() ) )
+                            || (owner.ownerOf( prop ) != -1 && owner.ownerOf( prop ) != primitive.getId()) )
+                    {
                         fail |= inconsistent( store, primitive, props, prop, PROPERTY_FOR_OTHER );
+                    }
                 }
-                if ( old.inUse() && old.getNextProp() != primitive.getNextProp() )
+                if ( old.inUse() && old.getNextProp() != propId)
                 { // first property changed for this primitive record ...
                     if ( !Record.NO_NEXT_PROPERTY.value( old.getNextProp() ) )
                     {
-                        PropertyRecord oldProp = props.forceGetRecord( old.getNextProp() );
+                        PropertyRecord oldProp = getPropertyRecord( old.getNextProp() );
                         if ( owner.ownerOf( oldProp ) != primitive.getId() )
-                            // ... but the old first property record didn't change accordingly
+                        // ... but the old first property record didn't change accordingly
+                        {
                             fail |= inconsistent( props, oldProp, store, primitive, ORPHANED_PROPERTY );
+                        }
                     }
                 }
             }
@@ -563,13 +647,49 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
             {
                 if ( !Record.NO_NEXT_PROPERTY.value( old.getNextProp() ) )
                 { // NOTE: with reuse in the same tx this check is invalid
-                    PropertyRecord prop = props.forceGetRecord( old.getNextProp() );
+                    PropertyRecord prop = getPropertyRecord( old.getNextProp() );
                     if ( prop.inUse() )
+                    {
                         fail |= inconsistent( store, primitive, props, prop, owner.propertyNotRemoved() );
+                    }
                 }
             }
         }
         return fail;
+    }
+
+    private PropertyRecord getPropertyRecord( long propId )
+    {
+        PropertyRecord propertyRecord = propRecords.get( propId );
+        if ( propertyRecord != null )
+        {
+            return propertyRecord;
+        }
+        propertyRecord = props.forceGetRecord( propId );
+        propRecords.put( propId, propertyRecord );
+        return propertyRecord;
+    }
+
+    @Override
+    protected <R extends AbstractBaseRecord> R getRecord( RecordStore<R> store, long id )
+    {
+        if ( store == nodes )
+        {
+            return (R) getNodeRecord( id );
+        }
+        if ( store == rels )
+        {
+            return (R) getRelationshipRecord( id );
+        }
+        if ( store == props )
+        {
+            return (R) getPropertyRecord( id );
+        }
+        if ( store == relTypes )
+        {
+            return (R) getRelType( (int) id );
+        }
+        return super.getRecord( store, id );
     }
 
     private boolean checkRelationship( RelationshipRecord rel )
@@ -577,38 +697,48 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
         boolean fail = false;
         if ( !rel.inUse() )
         {
-            RelationshipRecord old = rels.forceGetRaw( rel.getId() );
+            RelationshipRecord old = rels.forceGetRaw( rel );
             if ( old.inUse() )
             {
                 for (RelationshipField field : relFields)
                 {
                     long otherId = field.relOf( old );
-                    if (otherId == field.none)
+                    if ( otherId == field.none )
                     {
                         Long nodeId = field.nodeOf( old );
                         if (nodeId != null)
                         {
-                            NodeRecord node = nodes.forceGetRecord( nodeId );
-                            if (node.inUse() && node.getNextRel() == old.getId())
+                            NodeRecord node = getNodeRecord( nodeId );
+                            if ( node.inUse() && node.getNextRel() == old.getId() )
+                            {
                                 fail |= inconsistent( rels, rel, nodes, node, REMOVED_RELATIONSHIP_STILL_REFERENCED );
+                            }
                         }
                     }
                     else
                     {
-                        RelationshipRecord other = rels.forceGetRecord( otherId );
-                        if (other.inUse() &&field.invConsistent( old, other ))
-                            fail |= inconsistent( rels,rel, other, REMOVED_RELATIONSHIP_STILL_REFERENCED );
+                        RelationshipRecord other = getRelationshipRecord( otherId );
+                        if ( other.inUse() && field.invConsistent( old, other ) )
+                        {
+                            fail |= inconsistent( rels, rel, other, REMOVED_RELATIONSHIP_STILL_REFERENCED );
+                        }
                     }
                 }
                 fail |= checkPropertyReference( rel, rels, new OwningRelationship( rel.getId() ) );
             }
             return fail;
         }
-        if ( rel.getType() < 0 ) fail |= inconsistent( rels, rel, INVALID_TYPE_ID );
+        if ( rel.getType() < 0 )
+        {
+            fail |= inconsistent( rels, rel, INVALID_TYPE_ID );
+        }
         else
         {
-            RelationshipTypeRecord type = relTypes.forceGetRecord( rel.getType() );
-            if ( !type.inUse() ) fail |= inconsistent( rels, rel, relTypes, type, TYPE_NOT_IN_USE );
+            RelationshipTypeRecord type = getRelType( rel.getType() );
+            if ( !type.inUse() )
+            {
+                fail |= inconsistent( rels, rel, relTypes, type, TYPE_NOT_IN_USE );
+            }
         }
         for ( RelationshipField field : relFields )
         {
@@ -618,48 +748,84 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
                 Long nodeId = field.nodeOf( rel );
                 if ( nodeId != null )
                 {
-                    NodeRecord node = nodes.forceGetRecord( nodeId );
+                    NodeRecord node = getNodeRecord( nodeId );
                     if ( !node.inUse() || node.getNextRel() != rel.getId() )
+                    {
                         fail |= inconsistent( rels, rel, nodes, node, field.noBackReference );
+                    }
                 }
             }
             else
             {
-                RelationshipRecord other = rels.forceGetRecord( otherId );
+                RelationshipRecord other = getRelationshipRecord( otherId );
                 if ( !other.inUse() )
+                {
                     fail |= inconsistent( rels, rel, other, field.notInUse );
+                }
                 else if ( !field.invConsistent( rel, other ) )
+                {
                     fail |= inconsistent( rels, rel, other, field.differentChain );
+                }
             }
         }
         for ( NodeField field : nodeFields )
         {
             long nodeId = field.get( rel );
             if ( nodeId < 0 )
-                fail |= inconsistent( rels, rel, field.invalidReference);
+            {
+                fail |= inconsistent( rels, rel, field.invalidReference );
+            }
             else
             {
-                NodeRecord node = nodes.forceGetRecord( nodeId );
+                NodeRecord node = getNodeRecord( nodeId );
                 if ( !node.inUse() )
+                {
                     fail |= inconsistent( rels, rel, nodes, node, field.notInUse );
+                }
             }
         }
         fail |= checkPropertyReference( rel, rels, new OwningRelationship( rel.getId() ) );
         return fail;
     }
 
+    private RelationshipTypeRecord getRelType( int relType )
+    {
+        RelationshipTypeRecord relTypesRecord = relTypesRecords.get( relType );
+        if ( relTypesRecord != null )
+        {
+            return relTypesRecord;
+        }
+        relTypesRecord = relTypes.forceGetRecord( relType );
+        relTypesRecords.put( relType, relTypesRecord );
+        return relTypesRecord;
+    }
+
+    private RelationshipRecord getRelationshipRecord( long relId )
+    {
+        RelationshipRecord relationshipRecord = relRecords.get( relId );
+        if ( relationshipRecord != null )
+        {
+            return relationshipRecord;
+        }
+        relationshipRecord = rels.forceGetRecord( relId );
+        relRecords.put( relId, relationshipRecord );
+        return relationshipRecord;
+    }
+
     private boolean checkPropertyOwner( PropertyRecord prop, PropertyOwner newOwner )
     {
-        if (propertyOwners == null) return false;
-        Long propId = Long.valueOf( prop.getId() );
-        PropertyOwner oldOwner = propertyOwners.put( propId, newOwner );
+        if ( propertyOwners == null )
+        {
+            return false;
+        }
+        PropertyOwner oldOwner = propertyOwners.put( prop.getId(), newOwner );
         if ( oldOwner != null )
         {
             @SuppressWarnings( "unchecked" )
             RecordStore<PrimitiveRecord> oldStore = (RecordStore<PrimitiveRecord>) oldOwner.storeFrom( this ),
                                          newStore = (RecordStore<PrimitiveRecord>) newOwner.storeFrom( this );
-            return inconsistent( oldStore, oldStore.getRecord( oldOwner.id ),
-                                 newStore, newStore.getRecord( newOwner.id ),
+            return inconsistent( oldStore, oldStore.forceGetRecord( oldOwner.id ),
+                                 newStore, newStore.forceGetRecord( newOwner.id ),
                                  MULTIPLE_OWNERS.forProperty( prop ) );
         }
         else
@@ -673,29 +839,39 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
         boolean fail = false;
         if ( !property.inUse() )
         {
-            PropertyRecord old = props.forceGetRaw( property.getId() );
+            PropertyRecord old = props.forceGetRaw( property );
             if ( old.inUse() )
             {
                 if ( !Record.NO_NEXT_PROPERTY.value( old.getNextProp() ) )
                 {
-                    PropertyRecord next = props.forceGetRecord( old.getNextProp() );
+                    PropertyRecord next = getPropertyRecord( old.getNextProp() );
                     if ( next.inUse() && next.getPrevProp() == old.getId() )
+                    {
                         fail |= inconsistent( props, property, next, REMOVED_PROPERTY_STILL_REFERENCED );
+                    }
                 }
                 if ( !Record.NO_PREVIOUS_PROPERTY.value( old.getPrevProp() ) )
                 {
-                    PropertyRecord prev = props.forceGetRecord( old.getPrevProp() );
+                    PropertyRecord prev = getPropertyRecord( old.getPrevProp() );
                     if ( prev.inUse() && prev.getNextProp() == old.getId() )
+                    {
                         fail |= inconsistent( props, property, prev, REMOVED_PROPERTY_STILL_REFERENCED );
+                    }
                 }
                 else // property was first in chain
                 {
                     if ( property.getNodeId() != -1 )
+                    {
                         fail |= checkPropertyOwnerReference( property, property.getNodeId(), nodes );
+                    }
                     else if ( property.getRelId() != -1 )
+                    {
                         fail |= checkPropertyOwnerReference( property, property.getRelId(), rels );
-                    else if ( ((DiffRecordStore<PropertyRecord>)props).isModified( property.getId() ) )
+                    }
+                    else if ( ((DiffRecordStore<PropertyRecord>) props).isModified( property.getId() ) )
+                    {
                         fail |= inconsistent( props, property, PROPERTY_CHANGED_WITHOUT_OWNER ); // only a warning
+                    }
                 }
                 fail |= checkOwnerChain( property );
             }
@@ -704,40 +880,60 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
         long nextId = property.getNextProp();
         if ( !Record.NO_NEXT_PROPERTY.value( nextId ) )
         {
-            PropertyRecord next = props.forceGetRecord( nextId );
+            PropertyRecord next = getPropertyRecord( nextId );
             if ( !next.inUse() )
+            {
                 fail |= inconsistent( props, property, next, NEXT_PROPERTY_NOT_IN_USE );
+            }
             if ( next.getPrevProp() != property.getId() )
+            {
                 fail |= inconsistent( props, property, next, PROPERTY_NEXT_WRONG_BACKREFERENCE );
+            }
         }
         long prevId = property.getPrevProp();
         if ( !Record.NO_PREVIOUS_PROPERTY.value( prevId ) )
         {
-            PropertyRecord prev = props.forceGetRecord( prevId );
+            PropertyRecord prev = getPropertyRecord( prevId );
             if ( !prev.inUse() )
+            {
                 fail |= inconsistent( props, property, prev, PREV_PROPERTY_NOT_IN_USE );
+            }
             if ( prev.getNextProp() != property.getId() )
+            {
                 fail |= inconsistent( props, property, prev, PROPERTY_PREV_WRONG_BACKREFERENCE );
+            }
         }
         else // property is first in chain
         {
             if ( property.getNodeId() != -1 )
+            {
                 fail |= checkPropertyOwnerReference( property, property.getNodeId(), nodes );
+            }
             else if ( property.getRelId() != -1 )
+            {
                 fail |= checkPropertyOwnerReference( property, property.getRelId(), rels );
+            }
             else if ( props instanceof DiffRecordStore<?>
-                      && ( (DiffRecordStore<PropertyRecord>) props ).isModified( property.getId() ) )
+                    && ((DiffRecordStore<PropertyRecord>) props).isModified( property.getId() ) )
+            {
                 fail |= inconsistent( props, property, PROPERTY_CHANGED_WITHOUT_OWNER ); // only a warning
+            }
             // else - this information is only available from logs through DiffRecordStore
         }
         fail |= checkOwnerChain( property );
         for ( PropertyBlock block : property.getPropertyBlocks() )
         {
-            if ( block.getKeyIndexId() < 0 ) fail |= inconsistent( props, property, INVALID_PROPERTY_KEY.forBlock( block ) );
+            if ( block.getKeyIndexId() < 0 )
+            {
+                fail |= inconsistent( props, property, INVALID_PROPERTY_KEY.forBlock( block ) );
+            }
             else
             {
                 PropertyIndexRecord key = propIndexes.forceGetRecord( block.getKeyIndexId() );
-                if ( !key.inUse() ) fail |= inconsistent( props, property, propIndexes, key, UNUSED_PROPERTY_KEY.forBlock(  block ) );
+                if ( !key.inUse() )
+                {
+                    fail |= inconsistent( props, property, propIndexes, key, UNUSED_PROPERTY_KEY.forBlock( block ) );
+                }
             }
             RecordStore<DynamicRecord> dynStore = null;
             PropertyType type = block.forceGetType();
@@ -745,20 +941,25 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
             {
                 fail |= inconsistent( props, property, ILLEGAL_PROPERTY_TYPE.forBlock( block ) );
             }
-            else switch ( block.getType() )
+            else
             {
-            case STRING:
-                dynStore = strings;
-                break;
-            case ARRAY:
-                dynStore = arrays;
-                break;
+                switch ( block.getType() )
+                {
+                case STRING:
+                    dynStore = strings;
+                    break;
+                case ARRAY:
+                    dynStore = arrays;
+                    break;
+                }
             }
             if ( dynStore != null )
             {
                 DynamicRecord dynrec = dynStore.forceGetRecord( block.getSingleValueLong() );
                 if ( !dynrec.inUse() )
+                {
                     fail |= inconsistent( props, property, dynStore, dynrec, DYNAMIC_NOT_IN_USE.forBlock( block ) );
+                }
             }
         }
         return fail;
@@ -768,20 +969,29 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
     {
         boolean fail = false;
         RecordStore<? extends PrimitiveRecord> store = null;
-        long ownerId = -1;
+        PrimitiveRecord owner = null;
         if ( property.getNodeId() != -1 )
         {
+            NodeRecord node = getNodeRecord( property.getNodeId() );
+            if ( !property.inUse() )
+            {
+                node = nodes.forceGetRaw( node );
+            }
+            owner = node;
             store = nodes;
-            ownerId = property.getNodeId();
         }
         else if ( property.getRelId() != -1 )
         {
+            RelationshipRecord relationship = getRelationshipRecord( property.getRelId() );
+            if ( !property.inUse() )
+            {
+                relationship = rels.forceGetRaw( relationship );
+            }
+            owner = relationship;
             store = rels;
-            ownerId = property.getRelId();
         }
-        if ( store != null )
+        if ( owner != null )
         {
-            PrimitiveRecord owner = property.inUse() ? store.forceGetRecord( ownerId ) : store.forceGetRaw( ownerId );
             List<PropertyRecord> chain = new ArrayList<PropertyRecord>( 2 );
             PropertyRecord prop = null;
             for ( long propId = owner.getNextProp(), target = property.getId(); propId != target; propId = prop.getNextProp() )
@@ -791,45 +1001,60 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
                     fail |= inconsistent( props, property, store, owner, PROPERTY_CHANGED_FOR_WRONG_OWNER.forProperties( chain ) );
                     break; // chain ended, not found
                 }
-                prop = property.inUse() ? props.forceGetRecord( propId ) : props.forceGetRaw( propId );
+                prop = property.inUse() ? getPropertyRecord( propId )
+                                        : props.forceGetRaw( getPropertyRecord( propId ) );
                 chain.add( prop );
             }
         }
-        else if ( props instanceof DiffRecordStore<?> && ( (DiffRecordStore<?>) props ).isModified( property.getId() ) )
+        else if ( props instanceof DiffRecordStore<?> && ((DiffRecordStore<?>) props).isModified( property.getId() ) )
+        {
             fail |= inconsistent( props, property, PROPERTY_CHANGED_WITHOUT_OWNER ); // only a warning
+        }
         return fail;
     }
 
     private boolean checkPropertyOwnerReference( PropertyRecord property, long ownerId, RecordStore<? extends PrimitiveRecord> entityStore )
     {
         boolean fail = false;
-        PrimitiveRecord entity = entityStore.forceGetRecord( ownerId );
+        PrimitiveRecord entity = entityStore==nodes ? getNodeRecord( ownerId ) : getRelationshipRecord( ownerId );
         if ( !property.inUse() )
         {
             if ( entity.inUse() )
             {
                 if ( entity.getNextProp() == property.getId() )
+                {
                     fail |= inconsistent( props, property, entityStore, entity, REMOVED_PROPERTY_STILL_REFERENCED );
+                }
             }
             return fail;
         }
         if ( !entity.inUse() )
+        {
             fail |= inconsistent( props, property, entityStore, entity, OWNER_NOT_IN_USE );
+        }
         else if ( entity.getNextProp() != property.getId() )
+        {
             fail |= inconsistent( props, property, entityStore, entity, OWNER_DOES_NOT_REFERENCE_BACK );
+        }
         if ( entityStore instanceof DiffRecordStore<?> )
         {
-            DiffRecordStore<? extends PrimitiveRecord> diffs = (DiffRecordStore<? extends PrimitiveRecord>) entityStore;
+            DiffRecordStore<PrimitiveRecord> diffs = (DiffRecordStore<PrimitiveRecord>) entityStore;
             if ( diffs.isModified( entity.getId() ) )
             {
-                PrimitiveRecord old = diffs.forceGetRaw( entity.getId() );
+                PrimitiveRecord old = diffs.forceGetRaw( entity );
                 // IF old is in use and references a property record
                 if ( old.inUse() && !Record.NO_NEXT_PROPERTY.value( old.getNextProp() ) )
-                    // AND that property record is not the same as this property record
+                // AND that property record is not the same as this property record
+                {
                     if ( old.getNextProp() != property.getId() )
-                        // THEN that property record must also have been updated!
-                        if ( !( (DiffRecordStore<?>) props ).isModified( old.getNextProp() ) )
+                    // THEN that property record must also have been updated!
+                    {
+                        if ( !((DiffRecordStore<?>) props).isModified( old.getNextProp() ) )
+                        {
                             fail |= inconsistent( props, property, entityStore, entity, REPLACED_PROPERTY );
+                        }
+                    }
+                }
             }
         }
         return fail;
@@ -842,12 +1067,14 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
         {
             if ( store instanceof DiffRecordStore<?> )
             {
-                DynamicRecord old = store.forceGetRaw( record.getId() );
+                DynamicRecord old = store.forceGetRaw( record );
                 if ( old.inUse() && !Record.NO_NEXT_BLOCK.value( old.getNextBlock() ) )
                 {
                     DynamicRecord next = store.forceGetRecord( old.getNextBlock() );
                     if ( next.inUse() ) // the entire chain must be removed
+                    {
                         fail |= inconsistent( store, record, next, NEXT_DYNAMIC_NOT_REMOVED );
+                    }
                 }
             }
             return fail;
@@ -858,10 +1085,14 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
             // If next is set, then it must be in use
             DynamicRecord next = store.forceGetRecord( nextId );
             if ( !next.inUse() )
+            {
                 fail |= inconsistent( store, record, next, NEXT_DYNAMIC_NOT_IN_USE );
+            }
             // If next is set, then the size must be max
             if ( record.getLength() < store.getRecordSize() - store.getRecordHeaderSize() )
+            {
                 fail |= inconsistent( store, record, NON_FULL_DYNAMIC_WITH_NEXT );
+            }
         }
         if ( record.getId() != 0
              && record.getLength() > store.getRecordSize()
@@ -879,8 +1110,11 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
             DiffRecordStore<DynamicRecord> diffs = (DiffRecordStore<DynamicRecord>) store;
             if ( diffs.isModified( record.getId() ) && !record.isLight() )
             { // if the record is really modified it will be heavy
-                DynamicRecord prev = diffs.forceGetRaw( record.getId() );
-                if ( prev.inUse() ) fail |= inconsistent( store, record, prev, OVERWRITE_USED_DYNAMIC );
+                DynamicRecord prev = diffs.forceGetRaw( record );
+                if ( prev.inUse() )
+                {
+                    fail |= inconsistent( store, record, prev, OVERWRITE_USED_DYNAMIC );
+                }
             }
         }
         return fail;
@@ -888,19 +1122,37 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
 
     private boolean checkType( RelationshipTypeRecord type )
     {
-        if ( !type.inUse() ) return false; // no check for unused records
-        if ( Record.NO_NEXT_BLOCK.value( type.getNameId() ) ) return false; // accept this
+        if ( !type.inUse() )
+        {
+            return false; // no check for unused records
+        }
+        if ( Record.NO_NEXT_BLOCK.value( type.getNameId() ) )
+        {
+            return false; // accept this
+        }
         DynamicRecord record = typeNames.forceGetRecord( type.getNameId() );
-        if ( !record.inUse() ) return inconsistent( relTypes, type, typeNames, record, UNUSED_TYPE_NAME );
+        if ( !record.inUse() )
+        {
+            return inconsistent( relTypes, type, typeNames, record, UNUSED_TYPE_NAME );
+        }
         return false;
     }
 
     private boolean checkKey( PropertyIndexRecord key )
     {
-        if ( !key.inUse() ) return false; // no check for unused records
-        if ( Record.NO_NEXT_BLOCK.value( key.getNameId() ) ) return false; // accept this
+        if ( !key.inUse() )
+        {
+            return false; // no check for unused records
+        }
+        if ( Record.NO_NEXT_BLOCK.value( key.getNameId() ) )
+        {
+            return false; // accept this
+        }
         DynamicRecord record = propKeys.forceGetRecord( key.getNameId() );
-        if ( !record.inUse() ) return inconsistent( propIndexes, key, propKeys, record, UNUSED_KEY_NAME );
+        if ( !record.inUse() )
+        {
+            return inconsistent( propIndexes, key, propKeys, record, UNUSED_KEY_NAME );
+        }
         return false;
     }
 
@@ -994,8 +1246,14 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
             boolean invConsistent( RelationshipRecord rel, RelationshipRecord other )
             {
                 long node = getNode( rel );
-                if ( other.getFirstNode() == node ) return other.getFirstPrevRel() == rel.getId();
-                if ( other.getSecondNode() == node ) return other.getSecondPrevRel() == rel.getId();
+                if ( other.getFirstNode() == node )
+                {
+                    return other.getFirstPrevRel() == rel.getId();
+                }
+                if ( other.getSecondNode() == node )
+                {
+                    return other.getSecondPrevRel() == rel.getId();
+                }
                 return false;
             }
         },
@@ -1018,8 +1276,14 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
             boolean invConsistent( RelationshipRecord rel, RelationshipRecord other )
             {
                 long node = getNode( rel );
-                if ( other.getFirstNode() == node ) return other.getFirstNextRel() == rel.getId();
-                if ( other.getSecondNode() == node ) return other.getSecondNextRel() == rel.getId();
+                if ( other.getFirstNode() == node )
+                {
+                    return other.getFirstNextRel() == rel.getId();
+                }
+                if ( other.getSecondNode() == node )
+                {
+                    return other.getSecondNextRel() == rel.getId();
+                }
                 return false;
             }
         },
@@ -1035,8 +1299,14 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
             boolean invConsistent( RelationshipRecord rel, RelationshipRecord other )
             {
                 long node = getNode( rel );
-                if ( other.getFirstNode() == node ) return other.getFirstPrevRel() == rel.getId();
-                if ( other.getSecondNode() == node ) return other.getSecondPrevRel() == rel.getId();
+                if ( other.getFirstNode() == node )
+                {
+                    return other.getFirstPrevRel() == rel.getId();
+                }
+                if ( other.getSecondNode() == node )
+                {
+                    return other.getSecondPrevRel() == rel.getId();
+                }
                 return false;
             }
         },
@@ -1059,8 +1329,14 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
             boolean invConsistent( RelationshipRecord rel, RelationshipRecord other )
             {
                 long node = getNode( rel );
-                if ( other.getFirstNode() == node ) return other.getFirstNextRel() == rel.getId();
-                if ( other.getSecondNode() == node ) return other.getSecondNextRel() == rel.getId();
+                if ( other.getFirstNode() == node )
+                {
+                    return other.getFirstNextRel() == rel.getId();
+                }
+                if ( other.getSecondNode() == node )
+                {
+                    return other.getSecondNextRel() == rel.getId();
+                }
                 return false;
             }
         };
@@ -1091,6 +1367,5 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
         {
             return null;
         }
-
-  }
+    }
 }

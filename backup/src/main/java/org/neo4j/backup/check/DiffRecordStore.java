@@ -64,9 +64,9 @@ public class DiffRecordStore<R extends AbstractBaseRecord> implements RecordStor
         return diff.get( id ) != null;
     }
 
-    public R forceGetRaw( long id )
+    public R forceGetRaw( R record )
     {
-        return actual.forceGetRecord( id );
+        return actual.forceGetRecord( record.getLongId() );
     }
 
     @Override
