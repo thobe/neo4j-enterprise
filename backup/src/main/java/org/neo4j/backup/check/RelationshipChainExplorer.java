@@ -4,12 +4,16 @@ import static org.neo4j.backup.check.ConsistencyCheck.RelationshipField.FIRST_NE
 import static org.neo4j.backup.check.ConsistencyCheck.RelationshipField.FIRST_PREV;
 import static org.neo4j.backup.check.ConsistencyCheck.RelationshipField.SECOND_NEXT;
 import static org.neo4j.backup.check.ConsistencyCheck.RelationshipField.SECOND_PREV;
+import static org.neo4j.backup.check.RelationshipChainExplorer.RelationshipChainDirection.NEXT;
+import static org.neo4j.backup.check.RelationshipChainExplorer.RelationshipChainDirection.PREV;
 
+import org.neo4j.kernel.impl.nioneo.store.Record;
 import org.neo4j.kernel.impl.nioneo.store.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 
 public class RelationshipChainExplorer
 {
+    public static final int none = Record.NO_NEXT_RELATIONSHIP.intValue();
     private final RecordStore<RelationshipRecord> recordStore;
 
     public RelationshipChainExplorer( RecordStore<RelationshipRecord> recordStore )
@@ -20,49 +24,76 @@ public class RelationshipChainExplorer
     public RecordSet<RelationshipRecord> exploreRelationshipRecordChainsToDepthTwo( RelationshipRecord record )
     {
         RecordSet<RelationshipRecord> records = new RecordSet<RelationshipRecord>();
-        records.addAll( expandChains(
-                expandChainInBothDirections( record, FIRST_PREV, FIRST_NEXT ), SECOND_PREV, SECOND_NEXT ) );
-        records.addAll( expandChains(
-                expandChainInBothDirections( record, SECOND_PREV, SECOND_NEXT ), FIRST_PREV, FIRST_NEXT ) );
+        for ( ConsistencyCheck.NodeField nodeField : ConsistencyCheck.NodeField.values() )
+        {
+            long nodeId = nodeField.get( record );
+            records.addAll( expandChains( expandChainInBothDirections( record, nodeId ), nodeId ) );
+        }
         return records;
     }
 
-    private RecordSet<RelationshipRecord> expandChains( RecordSet<RelationshipRecord> records,
-                                                                   ConsistencyCheck.RelationshipField prevField,
-                                                                   ConsistencyCheck.RelationshipField nextField )
+    private RecordSet<RelationshipRecord> expandChains( RecordSet<RelationshipRecord> records, long otherNodeId )
     {
         RecordSet<RelationshipRecord> chains = new RecordSet<RelationshipRecord>();
         for ( RelationshipRecord record : records )
         {
-            chains.addAll( expandChainInBothDirections( record, prevField, nextField ) );
+            chains.addAll( expandChainInBothDirections( record,
+                    record.getFirstNode() == otherNodeId ? record.getSecondNode() : record.getFirstNode() ) );
         }
         return chains;
     }
 
-    private RecordSet<RelationshipRecord> expandChainInBothDirections( RelationshipRecord record,
-                                                                       ConsistencyCheck.RelationshipField prevField,
-                                                                       ConsistencyCheck.RelationshipField nextField )
+    private RecordSet<RelationshipRecord> expandChainInBothDirections( RelationshipRecord record, long nodeId )
     {
-        return expandChain( record, prevField ).union( expandChain( record, nextField ) );
+        return expandChain( record, nodeId, PREV ).union( expandChain( record, nodeId, NEXT ) );
     }
 
     protected RecordSet<RelationshipRecord> followChainFromNode(long nodeId, long relationshipId )
     {
         RelationshipRecord record = recordStore.getRecord( relationshipId );
-        return record.getFirstNode() == nodeId ? expandChain( record, FIRST_NEXT ) : expandChain( record, SECOND_NEXT );
+        return expandChain( record, nodeId, NEXT );
     }
 
-    private RecordSet<RelationshipRecord> expandChain( RelationshipRecord record,
-                                                        ConsistencyCheck.RelationshipField field )
+    private RecordSet<RelationshipRecord> expandChain( RelationshipRecord record, long nodeId,
+                                                       RelationshipChainDirection direction )
     {
         RecordSet<RelationshipRecord> chain = new RecordSet<RelationshipRecord>();
         chain.add( record );
         RelationshipRecord currentRecord = record;
-        while ( currentRecord.inUse() && field.relOf( currentRecord ) != field.none) {
-            currentRecord = recordStore.forceGetRecord( field.relOf( currentRecord ) );
+        long nextRelId;
+        while ( currentRecord.inUse() &&
+                (nextRelId = direction.fieldFor( nodeId, currentRecord ).relOf( currentRecord )) != none ) {
+            currentRecord = recordStore.forceGetRecord( nextRelId );
             chain.add( currentRecord );
         }
         return chain;
     }
 
+    protected enum RelationshipChainDirection
+    {
+        NEXT( FIRST_NEXT, SECOND_NEXT ),
+        PREV( FIRST_PREV, SECOND_PREV );
+
+        private final ConsistencyCheck.RelationshipField first;
+        private final ConsistencyCheck.RelationshipField second;
+
+        private RelationshipChainDirection( ConsistencyCheck.RelationshipField first, ConsistencyCheck.RelationshipField second )
+        {
+            this.first = first;
+            this.second = second;
+        }
+
+        protected ConsistencyCheck.RelationshipField fieldFor( long nodeId, RelationshipRecord rel )
+        {
+            if (rel.getFirstNode() == nodeId)
+            {
+                return first;
+            }
+            else if (rel.getSecondNode() == nodeId)
+            {
+                return second;
+            }
+            throw new IllegalArgumentException( String.format( "%d does not reference node %d", rel, nodeId ) );
+        }
+    }
 }

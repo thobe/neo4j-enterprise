@@ -41,8 +41,7 @@ public class RelationshipChainExplorerTest
         int nDegreeTwoNodes = 10;
         StoreAccess store = createStoreWithOneHighDegreeNodeAndSeveralDegreeTwoNodes( nDegreeTwoNodes );
         RecordStore<RelationshipRecord> relationshipStore = store.getRelationshipStore();
-        int relationshipTowardsEndOfChain = 16;
-        relationshipStore.updateRecord( new RelationshipRecord( relationshipTowardsEndOfChain, 0, 0, 0 ) );
+        breakTheChain( relationshipStore );
 
         // when
         int relationshipIdInMiddleOfChain = 10;
@@ -53,6 +52,12 @@ public class RelationshipChainExplorerTest
         // then
         int recordsInaccessibleBecauseOfBrokenChain = 3;
         assertEquals( nDegreeTwoNodes * 2 - recordsInaccessibleBecauseOfBrokenChain, records.size() );
+    }
+
+    private void breakTheChain( RecordStore<RelationshipRecord> relationshipStore )
+    {
+        int relationshipTowardsEndOfChain = 16;
+        relationshipStore.updateRecord( new RelationshipRecord( relationshipTowardsEndOfChain, 0, 0, 0 ) );
     }
 
     enum TestRelationshipType implements RelationshipType
@@ -72,7 +77,14 @@ public class RelationshipChainExplorerTest
             {
                 Node degreeTwoNode = database.createNode();
                 Node leafNode = database.createNode();
-                denseNode.createRelationshipTo( degreeTwoNode, TestRelationshipType.CONNECTED );
+                if ( i % 2 == 0 )
+                {
+                    denseNode.createRelationshipTo( degreeTwoNode, TestRelationshipType.CONNECTED );
+                }
+                else
+                {
+                    degreeTwoNode.createRelationshipTo( denseNode, TestRelationshipType.CONNECTED );
+                }
                 degreeTwoNode.createRelationshipTo( leafNode, TestRelationshipType.CONNECTED );
             }
             transaction.success();
