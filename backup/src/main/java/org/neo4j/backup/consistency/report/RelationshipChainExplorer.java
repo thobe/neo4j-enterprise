@@ -1,12 +1,10 @@
-package org.neo4j.backup.check;
+package org.neo4j.backup.consistency.report;
 
-import static org.neo4j.backup.check.ConsistencyCheck.RelationshipField.FIRST_NEXT;
-import static org.neo4j.backup.check.ConsistencyCheck.RelationshipField.FIRST_PREV;
-import static org.neo4j.backup.check.ConsistencyCheck.RelationshipField.SECOND_NEXT;
-import static org.neo4j.backup.check.ConsistencyCheck.RelationshipField.SECOND_PREV;
-import static org.neo4j.backup.check.RelationshipChainExplorer.RelationshipChainDirection.NEXT;
-import static org.neo4j.backup.check.RelationshipChainExplorer.RelationshipChainDirection.PREV;
+import static org.neo4j.backup.consistency.RelationshipChainDirection.NEXT;
+import static org.neo4j.backup.consistency.RelationshipChainDirection.PREV;
 
+import org.neo4j.backup.consistency.RelationshipChainDirection;
+import org.neo4j.backup.consistency.RelationshipNodeField;
 import org.neo4j.kernel.impl.nioneo.store.Record;
 import org.neo4j.kernel.impl.nioneo.store.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
@@ -24,7 +22,7 @@ public class RelationshipChainExplorer
     public RecordSet<RelationshipRecord> exploreRelationshipRecordChainsToDepthTwo( RelationshipRecord record )
     {
         RecordSet<RelationshipRecord> records = new RecordSet<RelationshipRecord>();
-        for ( ConsistencyCheck.NodeField nodeField : ConsistencyCheck.NodeField.values() )
+        for ( RelationshipNodeField nodeField : RelationshipNodeField.values() )
         {
             long nodeId = nodeField.get( record );
             records.addAll( expandChains( expandChainInBothDirections( record, nodeId ), nodeId ) );
@@ -69,31 +67,4 @@ public class RelationshipChainExplorer
         return chain;
     }
 
-    protected enum RelationshipChainDirection
-    {
-        NEXT( FIRST_NEXT, SECOND_NEXT ),
-        PREV( FIRST_PREV, SECOND_PREV );
-
-        private final ConsistencyCheck.RelationshipField first;
-        private final ConsistencyCheck.RelationshipField second;
-
-        private RelationshipChainDirection( ConsistencyCheck.RelationshipField first, ConsistencyCheck.RelationshipField second )
-        {
-            this.first = first;
-            this.second = second;
-        }
-
-        protected ConsistencyCheck.RelationshipField fieldFor( long nodeId, RelationshipRecord rel )
-        {
-            if (rel.getFirstNode() == nodeId)
-            {
-                return first;
-            }
-            else if (rel.getSecondNode() == nodeId)
-            {
-                return second;
-            }
-            throw new IllegalArgumentException( String.format( "%d does not reference node %d", rel, nodeId ) );
-        }
-    }
 }

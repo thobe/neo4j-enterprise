@@ -1,4 +1,4 @@
-package org.neo4j.backup.check;
+package org.neo4j.backup.consistency.report;
 
 import java.util.HashMap;
 import java.util.Iterator;

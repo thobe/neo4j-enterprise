@@ -17,27 +17,30 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.backup.check;
+package org.neo4j.backup.consistency.report;
 
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.neo4j.kernel.InternalAbstractGraphDatabase;
+import org.neo4j.backup.consistency.InconsistencyType;
+import org.neo4j.backup.consistency.check.ConsistencyRecordProcessor;
+import org.neo4j.backup.consistency.check.ConsistencyReporter;
+import org.neo4j.backup.consistency.check.MonitoringConsistencyReporter;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
+import org.neo4j.kernel.InternalAbstractGraphDatabase;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.StoreAccess;
 import org.neo4j.test.TargetDirectory;
 
-public class TestConsistencyCheck
+public class TestConsistencyRecordProcessor
 {
     private static class Inconsistency
     {
@@ -52,7 +55,10 @@ public class TestConsistencyCheck
         @Override
         public String toString()
         {
-            if ( referred != null ) return record + " & " + referred;
+            if ( referred != null )
+            {
+                return record + " & " + referred;
+            }
             return record.toString();
         }
     }
@@ -74,20 +80,40 @@ public class TestConsistencyCheck
             this.any = any;
         }
     }
-    
+
     private static void buildCleanDatabase( InternalAbstractGraphDatabase graphdb )
     {
 
     }
-    
+
     private List<Inconsistency> check( ExpectedInconsistencies expect )
     {
-        List<Inconsistency> report = new ArrayList<TestConsistencyCheck.Inconsistency>();
-        ConsistencyCheck checker = checker( store, report );
+        final List<Inconsistency> report = new ArrayList<TestConsistencyRecordProcessor.Inconsistency>();
+        MonitoringConsistencyReporter monitor = new MonitoringConsistencyReporter
+                ( new ConsistencyReporter()
+                {
+                    @Override
+                    public <R extends AbstractBaseRecord> void report( RecordStore<R> recordStore, R record,
+                                                                       InconsistencyType inconsistency )
+                    {
+                        report.add( new Inconsistency( record, null ) );
+                    }
+
+                    @Override
+                    public <R1 extends AbstractBaseRecord, R2 extends AbstractBaseRecord> void report(
+                            RecordStore<R1> recordStore, R1 record, RecordStore<? extends R2> referredStore,
+                            R2 referred,
+                            InconsistencyType inconsistency )
+                    {
+                        report.add( new Inconsistency( record, referred ) );
+                    }
+                } );
+        ConsistencyRecordProcessor checker = new ConsistencyRecordProcessor( store, monitor );
         boolean foundInconsistencies = false;
+        checker.run();
         try
         {
-            checker.run();
+            monitor.checkResult();
         }
         catch ( AssertionError e )
         {
@@ -101,28 +127,9 @@ public class TestConsistencyCheck
         return report;
     }
 
-    private static ConsistencyCheck checker( StoreAccess stores, final Collection<Inconsistency> report )
-    {
-        return new ConsistencyCheck( stores )
-        {
-            @Override
-            protected <R extends AbstractBaseRecord> void report( RecordStore<R> recordStore, R record, InconsistencyType inconsistency )
-            {
-                report.add( new Inconsistency( record, null ) );
-            }
-
-            @Override
-            protected <R1 extends AbstractBaseRecord, R2 extends AbstractBaseRecord> void report(
-                    RecordStore<R1> recordStore, R1 record, RecordStore<? extends R2> referredStore, R2 referred,
-                    InconsistencyType inconsistency )
-            {
-                report.add( new Inconsistency( record, referred ) );
-            }
-        };
-    }
-
     @Rule
-    public final TargetDirectory.TestDirectory test = TargetDirectory.testDirForTest( TestConsistencyCheck.class );
+    public final TargetDirectory.TestDirectory test = TargetDirectory.testDirForTest( TestConsistencyRecordProcessor
+            .class );
     private InternalAbstractGraphDatabase graphdb;
     private StoreAccess store;
 
@@ -140,7 +147,10 @@ public class TestConsistencyCheck
         store = null;
         try
         {
-            if ( graphdb != null ) graphdb.shutdown();
+            if ( graphdb != null )
+            {
+                graphdb.shutdown();
+            }
         }
         finally
         {

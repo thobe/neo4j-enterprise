@@ -1,9 +1,9 @@
-package org.neo4j.backup.check;
+package org.neo4j.backup.consistency.report;
 
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.neo4j.backup.check.RecordSet.asSet;
+import static org.neo4j.backup.consistency.report.RecordSet.asSet;
 import static org.neo4j.kernel.impl.nioneo.store.Record.NO_NEXT_PROPERTY;
 
 import org.hamcrest.Description;

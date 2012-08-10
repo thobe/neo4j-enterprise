@@ -27,7 +27,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.util.Map;
 import javax.transaction.xa.Xid;
-import org.neo4j.backup.check.ConsistencyCheck;
+import org.neo4j.backup.consistency.check.ConsistencyCheck;
 import org.neo4j.helpers.Args;
 import org.neo4j.helpers.ProgressIndicator;
 import org.neo4j.kernel.InternalAbstractGraphDatabase;

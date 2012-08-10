@@ -1,5 +1,6 @@
-package org.neo4j.backup.check;
+package org.neo4j.backup.consistency.report;
 
+import org.neo4j.backup.consistency.RelationshipNodeField;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
@@ -20,7 +21,7 @@ public class OwningNodeRelationshipChain
             RelationshipRecord relationship )
     {
         RecordSet<RelationshipRecord> records = new RecordSet<RelationshipRecord>();
-        for ( ConsistencyCheck.NodeField field : ConsistencyCheck.NodeField.values() )
+        for ( RelationshipNodeField field : RelationshipNodeField.values() )
         {
             long nodeId = field.get( relationship );
             NodeRecord nodeRecord = nodeStore.forceGetRecord( nodeId );
