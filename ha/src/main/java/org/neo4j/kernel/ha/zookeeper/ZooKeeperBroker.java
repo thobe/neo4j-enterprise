@@ -55,7 +55,7 @@ public class ZooKeeperBroker extends AbstractBroker
     {
         super( conf );
         this.zooClientFactory = zooClientFactory;
-        fetchInfoTimeout = conf.getInteger( HaSettings.coordinator_fetch_info_timeout );
+        fetchInfoTimeout = conf.get( HaSettings.coordinator_fetch_info_timeout );
         start();
     }
 

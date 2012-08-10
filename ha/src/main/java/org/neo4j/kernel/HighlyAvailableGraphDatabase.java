@@ -233,16 +233,17 @@ public class HighlyAvailableGraphDatabase
         kernelEventHandlers.add( new TxManagerCheckKernelEventHandler() );
 
         this.slaveUpdateMode = configuration.getEnum( SlaveUpdateMode.class, HaSettings.slave_coordinator_update_mode );
-        this.machineId = configuration.getInteger( HaSettings.server_id );
+        this.machineId = configuration.get( HaSettings.server_id );
         this.branchedDataPolicy = configuration.getEnum( BranchedDataPolicy.class, HaSettings.branched_data_policy );
-        this.localGraphWait = configuration.getInteger( HaSettings.read_timeout );
+        this.localGraphWait = configuration.get( HaSettings.read_timeout );
 
         this.masterClientResolver = new MasterClientResolver(
                 messageLog,
-                configuration.getInteger( HaSettings.read_timeout ),
-                configuration.isSet( HaSettings.lock_read_timeout ) ? configuration.getInteger( HaSettings.lock_read_timeout )
-                        : configuration.getInteger( HaSettings.read_timeout ),
-                configuration.getInteger( HaSettings.max_concurrent_channels_per_slave ) );
+                configuration.get( HaSettings.read_timeout ),
+                configuration.isSet( HaSettings.lock_read_timeout ) ? (int) configuration
+                        .get( HaSettings.lock_read_timeout )
+                        : (int) configuration.get( HaSettings.read_timeout ),
+                configuration.get( HaSettings.max_concurrent_channels_per_slave ) );
         masterClientResolver.getDefault();
         // TODO The dependency from BrokerFactory to 'this' is completely
         // broken. Needs rethinking
@@ -1418,7 +1419,7 @@ public class HighlyAvailableGraphDatabase
     {
         return new ZooKeeperClusterClient( configuration.get( HaSettings.coordinators ), getMessageLog(),
                 configuration.get( HaSettings.cluster_name ),
-                configuration.getInteger( HaSettings.zk_session_timeout ), masterClientResolver );
+                configuration.get( HaSettings.zk_session_timeout ), masterClientResolver );
     }
 
     // TODO This should be removed. Analyze usages

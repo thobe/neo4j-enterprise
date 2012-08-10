@@ -125,18 +125,18 @@ public class ZooClient extends AbstractZooKeeperManager
     public ZooClient( String storeDir, StringLogger stringLogger, Config conf, SlaveDatabaseOperations localDatabase,
             ClusterEventReceiver clusterReceiver, MasterClientFactory clientFactory )
     {
-        super( conf.get( HaSettings.coordinators ), stringLogger, conf.getInteger( zk_session_timeout ), clientFactory );
+        super( conf.get( HaSettings.coordinators ), stringLogger, conf.get( zk_session_timeout ), clientFactory );
         this.storeDir = storeDir;
         this.conf = conf;
         this.localDatabase = localDatabase;
         this.clusterReceiver = clusterReceiver;
-        machineId = conf.getInteger( server_id );
-        backupPort = conf.getInteger( OnlineBackupSettings.online_backup_port);
+        machineId = conf.get( server_id );
+        backupPort = conf.get( OnlineBackupSettings.online_backup_port );
         haServer = conf.isSet(server) ? conf.get( server ) : defaultServer();
         writeLastCommittedTx = conf.getEnum(SlaveUpdateMode.class, slave_coordinator_update_mode).syncWithZooKeeper;
         clusterName = conf.get( cluster_name );
         sequenceNr = "not initialized yet";
-        allowCreateCluster = conf.getBoolean( allow_init_cluster );
+        allowCreateCluster = conf.get( allow_init_cluster );
         asMachine = new Machine( machineId, 0, 0, 0, haServer, backupPort );
 
         try
@@ -180,9 +180,10 @@ public class ZooClient extends AbstractZooKeeperManager
 
     public Object instantiateMasterServer( GraphDatabaseAPI graphDb )
     {
-        int timeOut = conf.isSet( lock_read_timeout ) ? conf.getInteger( lock_read_timeout ) : conf.getInteger( read_timeout );
+        int timeOut = conf.isSet( lock_read_timeout ) ? (int) conf.get( lock_read_timeout )
+                                                      : (int) conf.get( read_timeout );
         return new MasterServer( new MasterImpl( graphDb, timeOut ), Machine.splitIpAndPort( haServer ).other(),
-                graphDb.getMessageLog(), conf.getInteger( max_concurrent_channels_per_slave ), timeOut,
+                graphDb.getMessageLog(), conf.get( max_concurrent_channels_per_slave ), timeOut,
                 new BranchDetectingTxVerifier( graphDb ) );
     }
 

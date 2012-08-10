@@ -48,7 +48,7 @@ public abstract class AbstractBroker implements Broker
 
     public int getMyMachineId()
     {
-        return config.getInteger( HaSettings.server_id );
+        return config.get( HaSettings.server_id );
     }
     
     @Override

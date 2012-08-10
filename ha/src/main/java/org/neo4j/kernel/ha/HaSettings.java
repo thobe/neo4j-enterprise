@@ -29,7 +29,7 @@ import org.neo4j.graphdb.factory.GraphDatabaseSetting.BooleanSetting;
 import org.neo4j.graphdb.factory.GraphDatabaseSetting.IntegerSetting;
 import org.neo4j.graphdb.factory.GraphDatabaseSetting.OptionsSetting;
 import org.neo4j.graphdb.factory.GraphDatabaseSetting.StringSetting;
-import org.neo4j.graphdb.factory.Migrator;
+import org.neo4j.kernel.configuration.Migrator;
 import org.neo4j.kernel.configuration.ConfigurationMigrator;
 
 /**

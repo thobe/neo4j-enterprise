@@ -48,10 +48,10 @@ public class OnlineBackupExtension extends KernelExtension<BackupServer>
     @Override
     protected BackupServer load( KernelData kernel )
     {
-        if (kernel.getConfig().getBoolean( OnlineBackupSettings.online_backup_enabled ))
+        if ( kernel.getConfig().get( OnlineBackupSettings.online_backup_enabled ) )
         {
             TheBackupInterface backup = new BackupImpl( kernel.graphDatabase() );
-            return new BackupServer( backup, kernel.getConfig().getInteger( OnlineBackupSettings.online_backup_port ),
+            return new BackupServer( backup, kernel.getConfig().get( OnlineBackupSettings.online_backup_port ),
                                                     kernel.graphDatabase().getMessageLog());
         } else
             return null;
