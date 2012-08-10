@@ -46,6 +46,12 @@ public class RelationshipChainExplorer
         return expandChain( record, prevField ).union( expandChain( record, nextField ) );
     }
 
+    protected RecordSet<RelationshipRecord> followChainFromNode(long nodeId, long relationshipId )
+    {
+        RelationshipRecord record = recordStore.getRecord( relationshipId );
+        return record.getFirstNode() == nodeId ? expandChain( record, FIRST_NEXT ) : expandChain( record, SECOND_NEXT );
+    }
+
     private RecordSet<RelationshipRecord> expandChain( RelationshipRecord record,
                                                         ConsistencyCheck.RelationshipField field )
     {

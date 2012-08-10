@@ -947,7 +947,7 @@ public abstract class ConsistencyCheck extends RecordStore.Processor implements 
     private static NodeField[] nodeFields = NodeField.values();
     private static RelationshipField[] relFields = RelationshipField.values();
 
-    private enum NodeField
+    protected enum NodeField
     {
         FIRST( SOURCE_NODE_INVALID, SOURCE_NODE_NOT_IN_USE )
         {
