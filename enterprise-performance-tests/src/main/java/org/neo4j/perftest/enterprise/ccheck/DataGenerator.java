@@ -26,7 +26,7 @@ import java.util.Map;
 import java.util.Random;
 
 import org.neo4j.graphdb.RelationshipType;
-import org.neo4j.helpers.ProgressIndicator;
+import org.neo4j.helpers.Progress;
 import org.neo4j.kernel.impl.batchinsert.BatchInserter;
 import org.neo4j.kernel.impl.batchinsert.BatchInserterImpl;
 import org.neo4j.perftest.enterprise.util.Configuration;
@@ -180,22 +180,27 @@ public class DataGenerator
 
     public void generateData( BatchInserter batchInserter )
     {
-        ProgressIndicator progress = initProgress();
-        generateNodes( batchInserter, progress );
-        generateRelationships( batchInserter, progress );
+        Progress.MultiPartBuilder builder = initProgress();
+        Progress nodeProgress = builder.progressForPart( "nodes", nodeCount );
+        Progress relationshipsProgress = builder.progressForPart( "relationships", relationshipCount );
+        builder.complete();
+
+        generateNodes( batchInserter, nodeProgress );
+        generateRelationships( batchInserter, relationshipsProgress );
     }
 
-    private void generateNodes( BatchInserter batchInserter, ProgressIndicator progress )
+    private void generateNodes( BatchInserter batchInserter, Progress progress )
     {
+        batchInserter.setNodeProperties( 0, generate( nodeProperties ) ); // reference node properties
         for ( int i = 1 /*reference node already exists*/; i < nodeCount; i++ )
         {
             batchInserter.createNode( generate( nodeProperties ) );
-            progress.update( false, i );
+            progress.set( i );
         }
-        progress.done( nodeCount );
+        progress.done();
     }
 
-    private void generateRelationships( BatchInserter batchInserter, ProgressIndicator progress )
+    private void generateRelationships( BatchInserter batchInserter, Progress progress )
     {
         for ( int i = 0; i < nodeCount; i++ )
         {
@@ -205,24 +210,17 @@ public class DataGenerator
                 {
                     batchInserter.createRelationship( i, RANDOM.nextInt( nodeCount ), relationshipSpec,
                                                       generate( relationshipProperties ) );
-                    progress.update( true, 1 );
+                    progress.add( 1 );
                 }
             }
         }
-        progress.done( relationshipCount );
+        progress.done();
     }
 
-    protected ProgressIndicator initProgress()
+    protected Progress.MultiPartBuilder initProgress()
     {
-        if ( reportProgress )
-        {
-            System.out.println( "Generating " + this );
-            return ProgressIndicator.MultiProgress.textual( System.out, nodeCount + relationshipCount );
-        }
-        else
-        {
-            return ProgressIndicator.NONE;
-        }
+        return (reportProgress ? Progress.textual( System.out ) : Progress.Factory.NONE)
+                .multipleParts( "Generating " + this );
     }
 
     private Map<String, Object> generate( List<PropertyGenerator> properties )

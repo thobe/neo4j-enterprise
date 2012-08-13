@@ -44,7 +44,9 @@ import java.util.List;
 import org.neo4j.backup.consistency.DiffRecordStore;
 import org.neo4j.backup.consistency.RelationshipChainField;
 import org.neo4j.backup.consistency.RelationshipNodeField;
+import org.neo4j.helpers.Progress;
 import org.neo4j.helpers.ProgressIndicator;
+import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
@@ -75,11 +77,11 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
 
     private final static RelationshipNodeField[] nodeFields = RelationshipNodeField.values();
     private final static RelationshipChainField[] relFields = RelationshipChainField.values();
-    private final ProgressIndicator.Factory progressFactory;
+    private final Progress.Factory progressFactory;
 
     public ConsistencyRecordProcessor( StoreAccess stores, InconsistencyReport report)
     {
-        this( stores, false, report, ProgressIndicator.Factory.NONE );
+        this( stores, false, report, Progress.Factory.NONE );
     }
 
     /**
@@ -87,7 +89,7 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
      *
      * @param stores the stores to check.
      */
-    public ConsistencyRecordProcessor( StoreAccess stores, InconsistencyReport report, ProgressIndicator.Factory progressFactory )
+    public ConsistencyRecordProcessor( StoreAccess stores, InconsistencyReport report, Progress.Factory progressFactory )
     {
         this( stores, false, report, progressFactory );
     }
@@ -103,7 +105,7 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
      * @param progressFactory
      */
     public ConsistencyRecordProcessor( StoreAccess stores, boolean checkPropertyOwners, InconsistencyReport report,
-                                       ProgressIndicator.Factory progressFactory )
+                                       Progress.Factory progressFactory )
     {
         this.nodes = stores.getNodeStore();
         this.rels = stores.getRelationshipStore();
@@ -169,7 +171,7 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
         boolean fail = false;
         if ( !node.inUse() )
         {
-            NodeRecord old = nodes.forceGetRaw( node.getId() );
+            NodeRecord old = nodes.forceGetRaw( node );
             if ( old.inUse() ) // Check that referenced records are also removed
             {
                 if ( !Record.NO_NEXT_RELATIONSHIP.value( old.getNextRel() ) )
@@ -199,7 +201,7 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
         boolean fail = false;
         if ( props != null )
         {
-            R old = store.forceGetRaw( primitive.getId() );
+            R old = store.forceGetRaw( primitive );
             if ( primitive.inUse() )
             {
                 if ( !Record.NO_NEXT_PROPERTY.value( primitive.getNextProp() ) )
@@ -241,7 +243,7 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
         boolean fail = false;
         if ( !rel.inUse() )
         {
-            RelationshipRecord old = rels.forceGetRaw( rel.getId() );
+            RelationshipRecord old = rels.forceGetRaw( rel );
             if ( old.inUse() )
             {
                 for (RelationshipChainField field : relFields)
@@ -337,7 +339,7 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
         boolean fail = false;
         if ( !property.inUse() )
         {
-            PropertyRecord old = props.forceGetRaw( property.getId() );
+            PropertyRecord old = props.forceGetRaw( property );
             if ( old.inUse() )
             {
                 if ( !Record.NO_NEXT_PROPERTY.value( old.getNextProp() ) )
@@ -445,7 +447,11 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
         }
         if ( store != null )
         {
-            PrimitiveRecord owner = property.inUse() ? store.forceGetRecord( ownerId ) : store.forceGetRaw( ownerId );
+            PrimitiveRecord owner = store.forceGetRecord( ownerId );
+            if ( !property.inUse() )
+            {
+                owner = ((RecordStore<PrimitiveRecord>) store).forceGetRaw( owner );
+            }
             List<PropertyRecord> chain = new ArrayList<PropertyRecord>( 2 );
             PropertyRecord prop = null;
             for ( long propId = owner.getNextProp(), target = property.getId(); propId != target; propId = prop.getNextProp() )
@@ -455,7 +461,11 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
                     fail |= report.inconsistent( props, property, store, owner, PROPERTY_CHANGED_FOR_WRONG_OWNER.forProperties( chain ) );
                     break; // chain ended, not found
                 }
-                prop = property.inUse() ? props.forceGetRecord( propId ) : props.forceGetRaw( propId );
+                prop = props.forceGetRecord( propId );
+                if ( !property.inUse() )
+                {
+                    prop = props.forceGetRaw( prop );
+                }
                 chain.add( prop );
             }
         }
@@ -483,10 +493,10 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
             fail |= report.inconsistent( props, property, entityStore, entity, OWNER_DOES_NOT_REFERENCE_BACK );
         if ( entityStore instanceof DiffRecordStore<?> )
         {
-            DiffRecordStore<? extends PrimitiveRecord> diffs = (DiffRecordStore<? extends PrimitiveRecord>) entityStore;
+            DiffRecordStore<PrimitiveRecord> diffs = (DiffRecordStore<PrimitiveRecord>) entityStore;
             if ( diffs.isModified( entity.getId() ) )
             {
-                PrimitiveRecord old = diffs.forceGetRaw( entity.getId() );
+                PrimitiveRecord old = diffs.forceGetRaw( entity );
                 // IF old is in use and references a property record
                 if ( old.inUse() && !Record.NO_NEXT_PROPERTY.value( old.getNextProp() ) )
                     // AND that property record is not the same as this property record
@@ -506,7 +516,7 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
         {
             if ( store instanceof DiffRecordStore<?> )
             {
-                DynamicRecord old = store.forceGetRaw( record.getId() );
+                DynamicRecord old = store.forceGetRaw( record );
                 if ( old.inUse() && !Record.NO_NEXT_BLOCK.value( old.getNextBlock() ) )
                 {
                     DynamicRecord next = store.forceGetRecord( old.getNextBlock() );
@@ -543,7 +553,7 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
             DiffRecordStore<DynamicRecord> diffs = (DiffRecordStore<DynamicRecord>) store;
             if ( diffs.isModified( record.getId() ) && !record.isLight() )
             { // if the record is really modified it will be heavy
-                DynamicRecord prev = diffs.forceGetRaw( record.getId() );
+                DynamicRecord prev = diffs.forceGetRaw( record );
                 if ( prev.inUse() ) fail |= report.inconsistent( store, record, prev, OVERWRITE_USED_DYNAMIC );
             }
         }
@@ -571,22 +581,56 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
     @Override
     public void run()
     {
-        ProgressIndicator progress = progressFactory.newMultiProgressIndicator( Long.MAX_VALUE );
+        Progress.MultiPartBuilder builder = progressFactory.multipleParts( "ConsistencyCheck" );
 
-        applyFiltered( nodes, progress, RecordStore.IN_USE );
-        applyFiltered( rels, progress, RecordStore.IN_USE );
-        // free up some heap space that isn't needed anymore
-        if ( propertyOwners != null ) propertyOwners.clear();
-        applyFiltered( props, progress, RecordStore.IN_USE );
-        // free up some heap space that isn't needed anymore
-        if ( propertyOwners != null ) propertyOwners.clear();
-        applyFiltered( strings, progress, RecordStore.IN_USE );
-        applyFiltered( arrays, progress, RecordStore.IN_USE );
-        applyFiltered( relTypes, progress, RecordStore.IN_USE );
-        applyFiltered( propIndexes, progress, RecordStore.IN_USE );
-        applyFiltered( propKeys, progress, RecordStore.IN_USE );
-        applyFiltered( typeNames, progress, RecordStore.IN_USE );
+        List<Runnable> tasks = new ArrayList<Runnable>( 9 );
 
-        progress.done();
+        tasks.add( storeProcessor( nodes, builder ) );
+        tasks.add( storeProcessor( rels, builder ) );
+        // free up some heap space that isn't needed anymore
+        if ( propertyOwners != null ) propertyOwners.clear(); // TODO: invoke in proper order
+        tasks.add( storeProcessor( props, builder ) );
+        // free up some heap space that isn't needed anymore
+        if ( propertyOwners != null ) propertyOwners.clear(); // TODO: invoke in proper order
+
+        tasks.add( storeProcessor( strings, builder ) );
+        tasks.add( storeProcessor( arrays, builder ) );
+        tasks.add( storeProcessor( relTypes, builder ) );
+        tasks.add( storeProcessor( propIndexes, builder ) );
+        tasks.add( storeProcessor( propKeys, builder ) );
+        tasks.add( storeProcessor( typeNames, builder ) );
+
+        builder.complete();
+
+        for ( Runnable task : tasks )
+        {
+            task.run();
+        }
+    }
+
+    private <R extends AbstractBaseRecord> StoreProcessor<R> storeProcessor( RecordStore<R> store,
+                                                                             Progress.MultiPartBuilder builder )
+    {
+        return new StoreProcessor<R>( store, builder );
+    }
+
+    private class StoreProcessor<R extends AbstractBaseRecord> implements Runnable
+    {
+        private final RecordStore<R> store;
+        private final Progress progress;
+
+        private StoreProcessor( RecordStore<R> store, Progress.MultiPartBuilder builder )
+        {
+            this.store = store;
+            String name = store.getStorageFileName();
+            this.progress = builder.progressForPart( name.substring( name.lastIndexOf( '/' ) + 1 ), store.getHighId() );
+        }
+
+        @Override
+        @SuppressWarnings( "unchecked" )
+        public void run()
+        {
+            applyFiltered( store, progress, RecordStore.IN_USE );
+        }
     }
 }

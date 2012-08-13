@@ -23,10 +23,10 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.codehaus.jackson.JsonGenerationException;
+import org.neo4j.helpers.Progress;
 import org.neo4j.helpers.ProgressIndicator;
 
-public class TimingProgress implements ProgressIndicator.Factory
+public class TimingProgress extends Progress.Factory
 {
     public interface Visitor
     {
@@ -38,92 +38,75 @@ public class TimingProgress implements ProgressIndicator.Factory
     }
 
     private final Visitor visitor;
-    private final ProgressIndicator.Factory actual;
+    private final Progress.Factory actual;
 
-    TimingProgress( Visitor visitor, ProgressIndicator.Factory actual )
+
+    TimingProgress( Visitor visitor, Progress.Factory actual )
     {
         this.visitor = visitor;
         this.actual = actual;
     }
 
     @Override
-    public ProgressIndicator newSimpleProgressIndicator( long total )
+    protected Progress.Indicator newIndicator( String process )
     {
-        return new Indicator( actual.newSimpleProgressIndicator( total ), total );
-    }
-
-    @Override
-    public ProgressIndicator newMultiProgressIndicator( long total )
-    {
-        return new Indicator( actual.newMultiProgressIndicator( total ), total );
-    }
-
-    private class Indicator extends ProgressIndicator.Decorator
-    {
-        private final Timer total;
-        private final long totalCount;
-        private Timer current;
-        private Map<String, Timer> timers = new HashMap<String, Timer>();
-
-        public Indicator( ProgressIndicator actual, long totalCount )
+        return new Progress.Indicator.Decorator( actual, process )
         {
-            super( actual );
-            this.totalCount = totalCount;
-            (this.total = new Timer( null )).start();
-        }
+            private final Timer total = new Timer( null );
+            private long totalCount;
+            private Map<String, Timer> timers = new HashMap<String, Timer>();
 
-        @Override
-        public void phase( String phase )
-        {
-            super.phase( phase );
-            if ( current != null )
+            @Override
+            public void startProcess( long totalCount )
             {
-                current.stop();
+                super.startProcess( totalCount );
+                this.totalCount = totalCount;
+                total.items = totalCount;
+                total.start();
             }
-            Timer timer = timers.get( phase );
-            if ( timer == null )
+
+            @Override
+            public void startPart( String part, long totalCount )
             {
-                timers.put( phase, timer = new Timer( phase ) );
+                super.startPart( part, totalCount );
+                Timer timer = new Timer( part );
+                timers.put( part, timer );
+                timer.items = totalCount;
+                timer.start();
             }
-            timer.start();
-            current = timer;
-        }
 
-        @Override
-        public void done( long totalProgress )
-        {
-            super.done( totalProgress );
-            if ( current != null )
+            @Override
+            public void completePart( String part )
             {
-                current.complete( totalProgress );
+                timers.get( part ).stop();
+                super.completePart( part );
             }
-            current = null;
-        }
 
-        @Override
-        public void done()
-        {
-            super.done();
-            total.complete( totalCount );
-            this.accept( visitor );
-        }
-
-        private void accept( Visitor visitor )
-        {
-            try
+            @Override
+            public void completeProcess()
             {
-                visitor.beginTimingProgress( total.items, total.time );
-                for ( Timer timer : timers.values() )
+                total.stop();
+                super.completeProcess();
+                this.accept(visitor);
+            }
+
+            private void accept( Visitor visitor )
+            {
+                try
                 {
-                    timer.accept( visitor );
+                    visitor.beginTimingProgress( total.items, total.time );
+                    for ( Timer timer : timers.values() )
+                    {
+                        timer.accept( visitor );
+                    }
+                    visitor.endTimingProgress();
                 }
-                visitor.endTimingProgress();
+                catch ( IOException e )
+                {
+                    e.printStackTrace();
+                }
             }
-            catch ( IOException e )
-            {
-                e.printStackTrace();
-            }
-        }
+        };
     }
 
     private static class Timer

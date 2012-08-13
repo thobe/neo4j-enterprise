@@ -6,6 +6,7 @@ import org.neo4j.backup.consistency.ConsistencyReport;
 import org.neo4j.backup.consistency.InconsistencyType;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
+import org.neo4j.helpers.Progress;
 import org.neo4j.helpers.ProgressIndicator;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.LongerShortString;
@@ -166,7 +167,7 @@ public class ConsistencyCheckTest
                     fail( "Unexpected inconsistency: " + type );
                     return !type.isWarning();
                 }
-            }, ProgressIndicator.Factory.NONE ).run();
+            }, Progress.Factory.NONE ).run();
         }
         finally
         {

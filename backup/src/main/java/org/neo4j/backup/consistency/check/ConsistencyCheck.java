@@ -31,6 +31,7 @@ import org.neo4j.backup.consistency.InconsistencyType;
 import org.neo4j.graphdb.factory.GraphDatabaseSetting;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.Args;
+import org.neo4j.helpers.Progress;
 import org.neo4j.helpers.ProgressIndicator;
 import org.neo4j.kernel.DefaultFileSystemAbstraction;
 import org.neo4j.kernel.DefaultIdGeneratorFactory;
@@ -148,10 +149,10 @@ public abstract class ConsistencyCheck implements Iterable<RecordStore<?>>,
 
     public static void run( String storeDir, Config config )
     {
-        run( new ProgressIndicator.Textual( System.err ), storeDir, config );
+        run( Progress.textual( System.err ), storeDir, config );
     }
 
-    public static void run( ProgressIndicator.Factory progressFactory, String storeDir, Config config )
+    public static void run( Progress.Factory progressFactory, String storeDir, Config config )
     {
         StoreFactory factory = new StoreFactory( config,
                                                  new DefaultIdGeneratorFactory(),
@@ -173,10 +174,10 @@ public abstract class ConsistencyCheck implements Iterable<RecordStore<?>>,
 
     public static void run( StoreAccess stores, boolean propowner )
     {
-        run( new ProgressIndicator.Textual( System.err ), stores, propowner );
+        run( Progress.textual( System.err ), stores, propowner );
     }
 
-    public static void run( final ProgressIndicator.Factory progressFactory, StoreAccess stores, boolean propowner )
+    public static void run( final Progress.Factory progressFactory, StoreAccess stores, boolean propowner )
     {
         new ConsistencyCheck( stores, propowner )
         {
@@ -244,7 +245,7 @@ public abstract class ConsistencyCheck implements Iterable<RecordStore<?>>,
     }
 
     @SuppressWarnings( "unchecked" )
-    public void run( ProgressIndicator.Factory progressFactory )
+    public void run( Progress.Factory progressFactory )
     {
         MonitoringConsistencyReporter monitor = new MonitoringConsistencyReporter( this );
         ConsistencyRecordProcessor processor = new ConsistencyRecordProcessor( stores, monitor, progressFactory );
