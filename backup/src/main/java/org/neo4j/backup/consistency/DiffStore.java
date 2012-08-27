@@ -112,12 +112,12 @@ public class DiffStore extends StoreAccess implements CommandRecordVisitor
 
     private void markRelationship( long rel )
     {
-        if ( !Record.NO_NEXT_RELATIONSHIP.value( rel ) ) getRelationshipStore().markDirty( rel );
+        if ( !Record.NO_NEXT_RELATIONSHIP.is( rel ) ) getRelationshipStore().markDirty( rel );
     }
 
     private void markProperty( long prop )
     {
-        if ( !Record.NO_NEXT_PROPERTY.value( prop ) ) getPropertyStore().markDirty( prop );
+        if ( !Record.NO_NEXT_PROPERTY.is( prop ) ) getPropertyStore().markDirty( prop );
     }
 
     @Override
@@ -148,7 +148,7 @@ public class DiffStore extends StoreAccess implements CommandRecordVisitor
             DiffRecordStore<DynamicRecord> store = ( record.getType() == PropertyType.STRING.intValue() )
                     ? getStringStore() : getArrayStore();
             store.forceUpdateRecord( record );
-            if ( !Record.NO_NEXT_BLOCK.value( record.getNextBlock() ) )
+            if ( !Record.NO_NEXT_BLOCK.is( record.getNextBlock() ) )
                 getPropertyStore().markDirty( record.getNextBlock() );
         }
     }

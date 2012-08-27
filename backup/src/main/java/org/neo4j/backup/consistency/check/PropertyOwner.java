@@ -6,6 +6,8 @@ import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsiste
         .PROPERTY_NOT_REMOVED_FOR_DELETED_RELATIONSHIP;
 
 import org.neo4j.backup.consistency.InconsistencyType;
+import org.neo4j.backup.consistency.store.RecordReference;
+import org.neo4j.backup.consistency.store.RecordReferencer;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
@@ -29,6 +31,8 @@ abstract class PropertyOwner
 
     abstract InconsistencyType propertyNotRemoved();
 
+    public abstract RecordReference<PrimitiveRecord> record( RecordReferencer records );
+
     static final class OwningNode extends PropertyOwner
     {
         OwningNode( long id )
@@ -46,6 +50,13 @@ abstract class PropertyOwner
         InconsistencyType propertyNotRemoved()
         {
             return PROPERTY_NOT_REMOVED_FOR_DELETED_NODE;
+        }
+
+        @Override
+        @SuppressWarnings( "unchecked" )
+        public RecordReference<PrimitiveRecord> record( RecordReferencer records )
+        {
+            return (RecordReference)records.node( id );
         }
 
         @Override
@@ -78,6 +89,13 @@ abstract class PropertyOwner
         InconsistencyType propertyNotRemoved()
         {
             return PROPERTY_NOT_REMOVED_FOR_DELETED_RELATIONSHIP;
+        }
+
+        @Override
+        @SuppressWarnings( "unchecked" )
+        public RecordReference<PrimitiveRecord> record( RecordReferencer records )
+        {
+            return (RecordReference)records.relationship( id );
         }
 
         @Override

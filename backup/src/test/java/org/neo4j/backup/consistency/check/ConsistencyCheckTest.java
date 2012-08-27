@@ -2,12 +2,11 @@ package org.neo4j.backup.consistency.check;
 
 import org.junit.Rule;
 import org.junit.Test;
-import org.neo4j.backup.consistency.ConsistencyReport;
+import org.neo4j.backup.consistency.ConsistencyReporting;
 import org.neo4j.backup.consistency.InconsistencyType;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.helpers.Progress;
-import org.neo4j.helpers.ProgressIndicator;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.LongerShortString;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
@@ -23,6 +22,7 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.when;
 import static org.neo4j.graphdb.DynamicRelationshipType.withName;
 import static org.neo4j.test.Property.property;
 import static org.neo4j.test.Property.set;
@@ -96,7 +96,7 @@ public class ConsistencyCheckTest
     public void shouldReportNothingOnConsistentDatabase() throws Exception
     {
         // given
-        ConsistencyReport report = mock( ConsistencyReport.class );
+        ConsistencyReporting report = mock( ConsistencyReporting.class );
 
         // when
         check( report );
@@ -119,16 +119,18 @@ public class ConsistencyCheckTest
             }
         } );
 
-        ConsistencyReport report = mock( ConsistencyReport.class );
+        ConsistencyReport.NodeConsistencyReport report = mock( ConsistencyReport.NodeConsistencyReport.class );
+        ConsistencyReporting reporter = mock( ConsistencyReporting.class );
+        when( reporter.forNode( any( NodeRecord.class ) ) ).thenReturn( report );
 
         // when
-        check( report );
+        check( reporter );
 
         // then
-        verify( report ).nodeRelationshipNotInUse( any( NodeRecord.class ), any( RelationshipRecord.class ) );
+        verify( report ).relationshipNotInUse( any( RelationshipRecord.class ) );
     }
 
-    private void check( final ConsistencyReport report )
+    private void check( final ConsistencyReporting report )
     {
         StoreAccess store = fixture.storeAccess();
         try
@@ -143,7 +145,7 @@ public class ConsistencyCheckTest
 
                     if ( type == InconsistencyType.ReferenceInconsistency.RELATIONSHIP_NOT_IN_USE )
                     {
-                        report.nodeRelationshipNotInUse( (NodeRecord) record, (RelationshipRecord) referred );
+                        report.forNode( (NodeRecord) record ).relationshipNotInUse( (RelationshipRecord) referred );
                     }
                     else
                     {
