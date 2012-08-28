@@ -1,20 +1,21 @@
 package org.neo4j.backup.consistency.check.full;
 
-import java.io.StringWriter;
-
-import org.hamcrest.Description;
-import org.hamcrest.Matcher;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.internal.matchers.TypeSafeMatcher;
+import org.neo4j.backup.consistency.report.ConsistencyReporter;
+import org.neo4j.backup.consistency.report.ConsistencySummaryStats;
+import org.neo4j.backup.consistency.store.DirectReferenceDispatcher;
+import org.neo4j.backup.consistency.store.SimpleRecordAccess;
 import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.helpers.Progress;
 import org.neo4j.helpers.UTF8;
+import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
+import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyType;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
@@ -24,7 +25,6 @@ import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.test.GraphStoreFixture;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.neo4j.test.Property.property;
 import static org.neo4j.test.Property.set;
@@ -52,19 +52,38 @@ public class FullCheckIntegrationTest
         }
     };
 
+    private ConsistencySummaryStats check()
+    {
+        return check( fixture.storeAccess() );
+    }
+
+    private ConsistencySummaryStats check( StoreAccess access )
+    {
+        ConsistencyReporter.SummarisingReporter reporter = ConsistencyReporter
+                .create( new SimpleRecordAccess( access ),
+                         new DirectReferenceDispatcher(),
+                         StringLogger.DEV_NULL );
+        FullCheck checker = new FullCheck( true, Progress.Factory.NONE );
+        checker.execute( access, reporter );
+        return reporter.getSummary();
+    }
+
+    private void verifyInconsistency( Class<? extends AbstractBaseRecord> recordType, ConsistencySummaryStats stats )
+    {
+        int count = stats.getInconsistencyCountForRecordType( recordType );
+        assertTrue( "Expected inconsistencies for records of type: " + recordType.getSimpleName(), count > 0 );
+        assertEquals( "Expected only inconsistencies of type: " + recordType.getSimpleName(),
+                      count, stats.getTotalInconsistencyCount() );
+    }
+
     @Test
     public void shouldCheckConsistencyOfAConsistentStore() throws Exception
     {
-        // given
-        StringWriter writer = new StringWriter();
-        StringLogger logger = StringLogger.wrap( writer );
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
-
         // when
-        check.execute( fixture.storeAccess(), logger );
+        ConsistencySummaryStats result = check();
 
         // then
-        assertEquals( "", writer.toString() );
+        assertEquals( 0, result.getTotalInconsistencyCount() );
     }
 
     @Test
@@ -82,17 +101,12 @@ public class FullCheckIntegrationTest
                 tx.create( new NodeRecord( inconsistentNode.get(), next.relationship(), -1 ) );
             }
         } );
-        StringWriter writer = new StringWriter();
-        StringLogger logger = StringLogger.wrap( writer );
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
 
         // when
-        check.execute( fixture.storeAccess(), logger );
+        ConsistencySummaryStats stats = check();
 
         // then
-        String logged = writer.toString();
-        assertTrue( "Expected inconsistencies", logged.trim().length() > 0 );
-        assertThat( logged, containsOnEachLine( "Node[" + inconsistentNode ) );
+        verifyInconsistency( NodeRecord.class, stats );
     }
 
     @Test
@@ -110,17 +124,12 @@ public class FullCheckIntegrationTest
                 tx.create( new RelationshipRecord( inconsistentRelationship.get(), 1, 2, 0 ) );
             }
         } );
-        StringWriter writer = new StringWriter();
-        StringLogger logger = StringLogger.wrap( writer );
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
 
         // when
-        check.execute( fixture.storeAccess(), logger );
+        ConsistencySummaryStats stats = check();
 
         // then
-        String logged = writer.toString();
-        assertTrue( "Expected inconsistencies", logged.trim().length() > 0 );
-        assertThat( logged, containsOnEachLine( "Relationship[" + inconsistentRelationship ) );
+        verifyInconsistency( RelationshipRecord.class, stats );
     }
 
     @Test
@@ -144,17 +153,12 @@ public class FullCheckIntegrationTest
                 tx.create( property );
             }
         } );
-        StringWriter writer = new StringWriter();
-        StringLogger logger = StringLogger.wrap( writer );
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
 
         // when
-        check.execute( fixture.storeAccess(), logger );
+        ConsistencySummaryStats stats = check();
 
         // then
-        String logged = writer.toString();
-        assertTrue( "Expected inconsistencies", logged.trim().length() > 0 );
-        assertThat( logged, containsOnEachLine( "Property[" + inconsistentProperty ) );
+        verifyInconsistency( PropertyRecord.class, stats );
     }
 
     @Test
@@ -186,17 +190,12 @@ public class FullCheckIntegrationTest
                 tx.create( property );
             }
         } );
-        StringWriter writer = new StringWriter();
-        StringLogger logger = StringLogger.wrap( writer );
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
 
         // when
-        check.execute( fixture.storeAccess(), logger );
+        ConsistencySummaryStats stats = check();
 
         // then
-        String logged = writer.toString();
-        assertTrue( "Expected inconsistencies", logged.trim().length() > 0 );
-        assertThat( logged, containsOnEachLine( "DynamicRecord[" + inconsistentString ) );
+        verifyInconsistency( DynamicRecord.class, stats );
     }
 
     @Test
@@ -228,17 +227,12 @@ public class FullCheckIntegrationTest
                 tx.create( property );
             }
         } );
-        StringWriter writer = new StringWriter();
-        StringLogger logger = StringLogger.wrap( writer );
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
 
         // when
-        check.execute( fixture.storeAccess(), logger );
+        ConsistencySummaryStats stats = check();
 
         // then
-        String logged = writer.toString();
-        assertTrue( "Expected inconsistencies", logged.trim().length() > 0 );
-        assertThat( logged, containsOnEachLine( "DynamicRecord[" + inconsistentArray ) );
+        verifyInconsistency( DynamicRecord.class, stats );
     }
 
     @Test
@@ -261,17 +255,11 @@ public class FullCheckIntegrationTest
         record.setNextBlock( record.getId() );
         access.getTypeNameStore().updateRecord( record );
 
-        StringWriter writer = new StringWriter();
-        StringLogger logger = StringLogger.wrap( writer );
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
-
         // when
-        check.execute( access, logger );
+        ConsistencySummaryStats stats = check( access );
 
         // then
-        String logged = writer.toString();
-        assertTrue( "Expected inconsistencies", logged.trim().length() > 0 );
-        assertThat( logged, containsOnEachLine( "DynamicRecord[" + inconsistentName ) );
+        verifyInconsistency( DynamicRecord.class, stats );
     }
 
     @Test
@@ -294,17 +282,11 @@ public class FullCheckIntegrationTest
         record.setNextBlock( record.getId() );
         access.getPropertyKeyStore().updateRecord( record );
 
-        StringWriter writer = new StringWriter();
-        StringLogger logger = StringLogger.wrap( writer );
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
-
         // when
-        check.execute( access, logger );
+        ConsistencySummaryStats stats = check( access );
 
         // then
-        String logged = writer.toString();
-        assertTrue( "Expected inconsistencies", logged.trim().length() > 0 );
-        assertThat( logged, containsOnEachLine( "DynamicRecord[" + inconsistentName ) );
+        verifyInconsistency( DynamicRecord.class, stats );
     }
 
     @Test
@@ -317,17 +299,11 @@ public class FullCheckIntegrationTest
         record.setInUse( true );
         access.getRelationshipTypeStore().updateRecord( record );
 
-        StringWriter writer = new StringWriter();
-        StringLogger logger = StringLogger.wrap( writer );
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
-
         // when
-        check.execute( access, logger );
+        ConsistencySummaryStats stats = check( access );
 
         // then
-        String logged = writer.toString();
-        assertTrue( "Expected inconsistencies", logged.trim().length() > 0 );
-        assertThat( logged, containsOnEachLine( "RelationshipTypeRecord[" + 1 ) );
+        verifyInconsistency( RelationshipTypeRecord.class, stats );
     }
 
     @Test
@@ -350,46 +326,11 @@ public class FullCheckIntegrationTest
         record.setInUse( false );
         access.getPropertyKeyStore().updateRecord( record );
 
-        StringWriter writer = new StringWriter();
-        StringLogger logger = StringLogger.wrap( writer );
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
-
         // when
-        check.execute( access, logger );
+        ConsistencySummaryStats stats = check( access );
 
         // then
-        String logged = writer.toString();
-        assertTrue( "Expected inconsistencies", logged.trim().length() > 0 );
-        assertThat( logged, containsOnEachLine( "PropertyIndexRecord[" + inconsistentKey ) );
-    }
-
-    private Matcher<String> containsOnEachLine( final String fragment )
-    {
-        return new TypeSafeMatcher<String>()
-        {
-            @Override
-            public boolean matchesSafely( String item )
-            {
-                for ( String line : item.split( "\n" ) )
-                {
-                    line = line.trim();
-                    if ( !"".equals( line ) )
-                    {
-                        if ( !(line.contains( "ERROR: " + fragment ) || line.contains( "WARNING: " + fragment )) )
-                        {
-                            return false;
-                        }
-                    }
-                }
-                return true;
-            }
-
-            @Override
-            public void describeTo( Description description )
-            {
-                description.appendText( "String where each line contains " ).appendValue( fragment );
-            }
-        };
+        verifyInconsistency( PropertyIndexRecord.class, stats );
     }
 
     private static class Reference<T>
