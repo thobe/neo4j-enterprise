@@ -26,21 +26,18 @@ class PropertyOwnerCheck
         return new RecordCheck<RECORD, REPORT>()
         {
             @Override
-            public REPORT report( ConsistencyReport.Reporter reporter, RECORD record )
-            {
-                return checker.report( reporter, record );
-            }
-
-            @Override
             public void check( RECORD record, REPORT report, RecordReferencer records )
             {
-                long prop = record.getNextProp();
-                if ( !Record.NO_NEXT_PROPERTY.is( prop ) )
+                if ( record.inUse() )
                 {
-                    PropertyOwner previous = owners.put( prop, checker.owner( record ) );
-                    if ( previous != null )
+                    long prop = record.getNextProp();
+                    if ( !Record.NO_NEXT_PROPERTY.is( prop ) )
                     {
-                        report.forReference( previous.record( records ), checker.ownerCheck );
+                        PropertyOwner previous = owners.put( prop, checker.owner( record ) );
+                        if ( previous != null )
+                        {
+                            report.forReference( previous.record( records ), checker.ownerCheck );
+                        }
                     }
                 }
                 checker.check( record, report, records );

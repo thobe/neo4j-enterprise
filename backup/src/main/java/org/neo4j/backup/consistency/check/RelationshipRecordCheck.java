@@ -16,13 +16,6 @@ public class RelationshipRecordCheck
     }
 
     @Override
-    public ConsistencyReport.RelationshipConsistencyReport report( ConsistencyReport.Reporter reporter,
-                                                                   RelationshipRecord relationship )
-    {
-        return reporter.forRelationship( relationship );
-    }
-
-    @Override
     PropertyOwner owner( RelationshipRecord record )
     {
         return new PropertyOwner.OwningRelationship( record.getId() );

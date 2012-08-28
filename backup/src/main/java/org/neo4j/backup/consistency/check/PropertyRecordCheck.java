@@ -12,13 +12,6 @@ public class PropertyRecordCheck
         implements RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport>
 {
     @Override
-    public ConsistencyReport.PropertyConsistencyReport report( ConsistencyReport.Reporter reporter,
-                                                               PropertyRecord property )
-    {
-        return reporter.forProperty( property );
-    }
-
-    @Override
     public void checkChange( PropertyRecord oldRecord, PropertyRecord newRecord,
                              ConsistencyReport.PropertyConsistencyReport report, RecordReferencer records )
     {

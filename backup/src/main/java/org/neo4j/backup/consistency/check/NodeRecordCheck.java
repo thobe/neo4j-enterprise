@@ -13,12 +13,6 @@ public class NodeRecordCheck extends PrimitiveRecordCheck<NodeRecord, Consistenc
     }
 
     @Override
-    public ConsistencyReport.NodeConsistencyReport report( ConsistencyReport.Reporter reporter, NodeRecord node )
-    {
-        return reporter.forNode(node);
-    }
-
-    @Override
     PropertyOwner owner( NodeRecord record )
     {
         return new PropertyOwner.OwningNode( record.getId() );

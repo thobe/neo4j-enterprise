@@ -27,17 +27,23 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
 
     public interface Reporter
     {
-        NodeConsistencyReport forNode( NodeRecord node );
+        void forNode( NodeRecord node,
+                      RecordCheck<NodeRecord, NodeConsistencyReport> checker );
 
-        RelationshipConsistencyReport forRelationship( RelationshipRecord relationship );
+        void forRelationship( RelationshipRecord relationship,
+                              RecordCheck<RelationshipRecord, RelationshipConsistencyReport> checker );
 
-        PropertyConsistencyReport forProperty( PropertyRecord property );
+        void forProperty( PropertyRecord property,
+                          RecordCheck<PropertyRecord, PropertyConsistencyReport> checker );
 
-        LabelConsistencyReport forRelationshipLabel( RelationshipTypeRecord label );
+        void forRelationshipLabel( RelationshipTypeRecord label,
+                                   RecordCheck<RelationshipTypeRecord, LabelConsistencyReport> checker );
 
-        PropertyKeyConsistencyReport forPropertyKey( PropertyIndexRecord key );
+        void forPropertyKey( PropertyIndexRecord key,
+                             RecordCheck<PropertyIndexRecord, PropertyKeyConsistencyReport> checker );
 
-        DynamicConsistencyReport forDynamicBlock( DynamicRecord record );
+        void forDynamicBlock( DynamicRecord record,
+                              RecordCheck<DynamicRecord, DynamicConsistencyReport> checker );
     }
 
     <REFERRED extends AbstractBaseRecord> void forReference( RecordReference<REFERRED> other,
@@ -257,5 +263,9 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
         @Documented
         @Warning
         void emptyNextBlock( DynamicRecord next );
+
+        /** The next block references this (the same) record. */
+        @Documented
+        void selfReferentialNext();
     }
 }

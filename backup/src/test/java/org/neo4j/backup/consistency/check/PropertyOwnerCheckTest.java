@@ -14,6 +14,7 @@ import static org.neo4j.backup.consistency.check.RecordCheckTestBase.NONE;
 import static org.neo4j.backup.consistency.check.RecordCheckTestBase.add;
 import static org.neo4j.backup.consistency.check.RecordCheckTestBase.check;
 import static org.neo4j.backup.consistency.check.RecordCheckTestBase.inUse;
+import static org.neo4j.backup.consistency.check.RecordCheckTestBase.notInUse;
 
 public class PropertyOwnerCheckTest
 {
@@ -43,6 +44,30 @@ public class PropertyOwnerCheckTest
 
         NodeRecord node1 = add( records, inUse( new NodeRecord( 1, NONE, 7 ) ) );
         NodeRecord node2 = add( records, inUse( new NodeRecord( 2, NONE, 8 ) ) );
+
+        // when
+        ConsistencyReport.NodeConsistencyReport report1 =
+                check( ConsistencyReport.NodeConsistencyReport.class, nodeChecker, node1, records );
+        ConsistencyReport.NodeConsistencyReport report2 =
+                check( ConsistencyReport.NodeConsistencyReport.class, nodeChecker, node2, records );
+
+        // then
+        verifyZeroInteractions( report1 );
+        verifyZeroInteractions( report2 );
+    }
+
+    @Test
+    public void shouldNotReportAnythingForNodesNotInUse() throws Exception
+    {
+        // given
+        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker =
+                decorator.decorate( nodeChecker() );
+
+        RecordAccess records = mock( RecordAccess.class );
+
+        NodeRecord node1 = add( records, notInUse( new NodeRecord( 1, NONE, 6 ) ) );
+        NodeRecord node2 = add( records, notInUse( new NodeRecord( 2, NONE, 6 ) ) );
 
         // when
         ConsistencyReport.NodeConsistencyReport report1 =

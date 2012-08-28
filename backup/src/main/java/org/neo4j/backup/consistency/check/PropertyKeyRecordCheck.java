@@ -1,20 +1,13 @@
 package org.neo4j.backup.consistency.check;
 
-import org.neo4j.backup.consistency.store.RecordReferencer;
 import org.neo4j.backup.consistency.store.RecordReference;
+import org.neo4j.backup.consistency.store.RecordReferencer;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
 
 public class PropertyKeyRecordCheck
         extends NameRecordCheck<PropertyIndexRecord, ConsistencyReport.PropertyKeyConsistencyReport>
 {
-    @Override
-    public ConsistencyReport.PropertyKeyConsistencyReport report( ConsistencyReport.Reporter reporter,
-                                                                  PropertyIndexRecord key )
-    {
-        return reporter.forPropertyKey( key );
-    }
-
     @Override
     protected RecordReference<DynamicRecord> name( RecordReferencer records, int id )
     {

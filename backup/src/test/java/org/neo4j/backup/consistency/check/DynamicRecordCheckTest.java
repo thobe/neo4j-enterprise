@@ -6,9 +6,8 @@ import org.junit.runners.JUnit4;
 import org.junit.runners.Suite;
 import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.kernel.impl.nioneo.store.AbstractDynamicStore;
-import org.neo4j.kernel.impl.nioneo.store.DynamicArrayStore;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
-import org.neo4j.kernel.impl.nioneo.store.DynamicStringStore;
+import org.neo4j.kernel.impl.nioneo.store.RecordStore;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -85,6 +84,22 @@ public abstract class DynamicRecordCheckTest
 
         // then
         verify( report ).nextNotInUse( next );
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportSelfReferentialNext() throws Exception
+    {
+        // given
+        RecordAccess records = mock( RecordAccess.class );
+        DynamicRecord property = add( records, inUse( fill( record( 42 ) ) ) );
+        property.setNextBlock( property.getId() );
+
+        // when
+        ConsistencyReport.DynamicConsistencyReport report = check( property, records );
+
+        // then
+        verify( report ).selfReferentialNext();
         verifyOnlyReferenceDispatch( report );
     }
 
@@ -167,7 +182,7 @@ public abstract class DynamicRecordCheckTest
     {
         public StringStore()
         {
-            super( new DynamicRecordCheck.StringRecordCheck( configure( DynamicStringStore.class, 66 ) ), 66 );
+            super( new DynamicRecordCheck( configure( 66 ), DynamicRecordCheck.StoreDereference.STRING ), 66 );
         }
 
         @Override
@@ -189,7 +204,7 @@ public abstract class DynamicRecordCheckTest
     {
         public ArrayStore()
         {
-            super( new DynamicRecordCheck.ArrayRecordCheck( configure( DynamicArrayStore.class, 66 ) ), 66 );
+            super( new DynamicRecordCheck( configure( 66 ), DynamicRecordCheck.StoreDereference.ARRAY ), 66 );
         }
 
         @Override
@@ -206,9 +221,10 @@ public abstract class DynamicRecordCheckTest
         }
     }
 
-    static <S extends AbstractDynamicStore> S configure( Class<S> storeClass, int blockSize )
+    static RecordStore<DynamicRecord> configure( int blockSize )
     {
-        S mock = mock( storeClass );
+        @SuppressWarnings( "unchecked" )
+        RecordStore<DynamicRecord> mock = mock( RecordStore.class );
         when( mock.getRecordSize() ).thenReturn( blockSize + AbstractDynamicStore.BLOCK_HEADER_SIZE );
         when( mock.getRecordHeaderSize() ).thenReturn( AbstractDynamicStore.BLOCK_HEADER_SIZE );
         return mock;

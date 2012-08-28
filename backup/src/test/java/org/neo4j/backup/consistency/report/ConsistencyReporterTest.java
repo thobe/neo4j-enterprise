@@ -1,6 +1,7 @@
 package org.neo4j.backup.consistency.report;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -13,8 +14,14 @@ import org.junit.rules.TestRule;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.model.Statement;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 import org.neo4j.backup.consistency.check.ConsistencyReport;
+import org.neo4j.backup.consistency.check.RecordCheck;
+import org.neo4j.backup.consistency.store.RecordAccess;
+import org.neo4j.backup.consistency.store.RecordReferencer;
 import org.neo4j.backup.consistency.store.ReferenceDispatcher;
+import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
@@ -25,10 +32,12 @@ import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
 import org.neo4j.kernel.impl.util.StringLogger;
 
 import static org.junit.Assert.assertThat;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
 @RunWith(Parameterized.class)
-public class ConsistencyReporterTest
+public class ConsistencyReporterTest implements Answer
 {
     @Test
     public void shouldLogInconsistency() throws Exception
@@ -37,15 +46,14 @@ public class ConsistencyReporterTest
         StringBuffer result = new StringBuffer();
         StringLogger logger = StringLogger.wrap( result );
         ConsistencyReport.Reporter reporter = ConsistencyReporter
-                .create( mock( ReferenceDispatcher.class ), logger );
-        Object report = reportMethod.invoke( reporter, parameters( reportMethod ) );
+                .create( mock( RecordAccess.class ), mock( ReferenceDispatcher.class ), logger );
 
         // when
-        method.invoke( report, parameters( method ) );
+        reportMethod.invoke( reporter, parameters( reportMethod ) );
 
         // then
         assertThat( result.toString(), containsString( " // " ) );
-        System.out.println( result );
+        // System.out.println( this + ": \n\t" + result );
     }
 
     private final Method reportMethod;
@@ -63,7 +71,9 @@ public class ConsistencyReporterTest
         ArrayList<Object[]> methods = new ArrayList<Object[]>();
         for ( Method reporterMethod : ConsistencyReport.Reporter.class.getMethods() )
         {
-            for ( Method method : reporterMethod.getReturnType().getMethods() )
+            ParameterizedType checkerParameter = (ParameterizedType)reporterMethod.getGenericParameterTypes()[1];
+            Class reportType = (Class) checkerParameter.getActualTypeArguments()[1];
+            for ( Method method : reportType.getMethods() )
             {
                 if ( !method.getName().equals( "forReference" ) )
                 {
@@ -100,9 +110,17 @@ public class ConsistencyReporterTest
     };
 
     @Override
+    public Object answer( InvocationOnMock invocation ) throws Throwable
+    {
+        method.invoke( invocation.getArguments()[1], parameters( method ) );
+        return null;
+    }
+
+    @Override
     public String toString()
     {
-        return "report." + reportMethod.getName() + "()." + method.getName() + "()";
+        return String.format( "report.%s(record, RecordCheck( reporter ){ reporter.%s(); })",
+                              reportMethod.getName(), method.getName() );
     }
 
     private Object[] parameters( Method method )
@@ -118,6 +136,10 @@ public class ConsistencyReporterTest
 
     private Object parameter( Class<?> type )
     {
+        if (type == RecordCheck.class)
+        {
+            return mockChecker();
+        }
         if ( type == NodeRecord.class )
         {
             return new NodeRecord( 0, 1, 2 );
@@ -147,6 +169,16 @@ public class ConsistencyReporterTest
             return new DynamicRecord( 0 );
         }
         throw new IllegalArgumentException( type.getName() );
+    }
+
+    @SuppressWarnings("unchecked")
+    private RecordCheck mockChecker()
+    {
+        RecordCheck checker = mock( RecordCheck.class );
+        doAnswer( this ).when( checker ).check( any( AbstractBaseRecord.class ),
+                                                any( ConsistencyReport.class ),
+                                                any( RecordReferencer.class ) );
+        return checker;
     }
 
     private static Matcher<String> containsString( final String substring )

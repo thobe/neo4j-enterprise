@@ -5,10 +5,19 @@ import java.lang.reflect.Method;
 
 import org.neo4j.backup.consistency.check.ComparativeRecordChecker;
 import org.neo4j.backup.consistency.check.ConsistencyReport;
+import org.neo4j.backup.consistency.check.RecordCheck;
+import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.backup.consistency.store.RecordReference;
+import org.neo4j.backup.consistency.store.RecordReferencer;
 import org.neo4j.backup.consistency.store.ReferenceDispatcher;
 import org.neo4j.kernel.impl.annotations.Documented;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
+import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
+import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
+import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
+import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
+import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
+import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
 import org.neo4j.kernel.impl.util.StringLogger;
 
 import static java.lang.reflect.Proxy.newProxyInstance;
@@ -46,19 +55,69 @@ public class ConsistencyReporter implements InvocationHandler
         this.record = record;
     }
 
-    public static ConsistencyReport.Reporter create( final ReferenceDispatcher dispatcher, final StringLogger logger )
+    public static ConsistencyReport.Reporter create( RecordAccess access, final ReferenceDispatcher dispatcher,
+                                                     final StringLogger logger )
     {
-        return proxy( ConsistencyReport.Reporter.class, new InvocationHandler()
+        final RecordReferencer records = new RecordReferencer( access );
+        return new ConsistencyReport.Reporter()
         {
-            @Override
-            public Object invoke( Object proxy, Method method, Object[] args ) throws Throwable
+            private <RECORD extends AbstractBaseRecord, REPORT extends ConsistencyReport<RECORD, REPORT>>
+            REPORT reporter( Class<REPORT> type, RECORD record )
             {
-                return proxy( method.getReturnType(),
-                              new ConsistencyReporter( dispatcher, logger, (AbstractBaseRecord) args[0] ) );
+                return proxy( type, new ConsistencyReporter( dispatcher, logger, record ) );
             }
-        } );
+
+            @Override
+            public void forNode( NodeRecord node,
+                                 RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> checker )
+            {
+                checker.check( node, reporter( ConsistencyReport.NodeConsistencyReport.class, node ), records );
+            }
+
+            @Override
+            public void forRelationship( RelationshipRecord relationship,
+                                         RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> checker )
+            {
+                checker.check( relationship,
+                               reporter( ConsistencyReport.RelationshipConsistencyReport.class, relationship ),
+                               records );
+            }
+
+            @Override
+            public void forProperty( PropertyRecord property,
+                                     RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> checker )
+            {
+                checker.check( property, reporter( ConsistencyReport.PropertyConsistencyReport.class, property ),
+                               records );
+            }
+
+            @Override
+            public void forRelationshipLabel( RelationshipTypeRecord label,
+                                              RecordCheck<RelationshipTypeRecord, ConsistencyReport.LabelConsistencyReport> checker )
+            {
+                checker.check( label, reporter( ConsistencyReport.LabelConsistencyReport.class, label ), records );
+            }
+
+            @Override
+            public void forPropertyKey( PropertyIndexRecord key,
+                                        RecordCheck<PropertyIndexRecord, ConsistencyReport.PropertyKeyConsistencyReport> checker )
+            {
+                checker.check( key, reporter( ConsistencyReport.PropertyKeyConsistencyReport.class, key ), records );
+            }
+
+            @Override
+            public void forDynamicBlock( DynamicRecord record,
+                                         RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport> checker )
+            {
+                checker.check( record, reporter( ConsistencyReport.DynamicConsistencyReport.class, record ), records );
+            }
+        };
     }
 
+    /**
+     * Invoked when an inconsistency is encountered.
+     * @param args array of the items referenced from this record with which it is inconsistent.
+     */
     @Override
     public synchronized Object invoke( Object proxy, Method method, Object[] args ) throws Throwable
     {
@@ -79,7 +138,7 @@ public class ConsistencyReporter implements InvocationHandler
                 }
             }
             Documented annotation = method.getAnnotation( Documented.class );
-            if ( annotation != null )
+            if ( annotation != null && !"".equals( annotation.value() ) )
             {
                 message.append( "// " ).append( annotation.value() );
             }

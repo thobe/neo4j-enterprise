@@ -1,56 +1,59 @@
 package org.neo4j.backup.consistency.check;
 
-import org.neo4j.backup.consistency.store.RecordReferencer;
 import org.neo4j.backup.consistency.store.RecordReference;
-import org.neo4j.kernel.impl.nioneo.store.DynamicArrayStore;
+import org.neo4j.backup.consistency.store.RecordReferencer;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
-import org.neo4j.kernel.impl.nioneo.store.DynamicStringStore;
 import org.neo4j.kernel.impl.nioneo.store.Record;
+import org.neo4j.kernel.impl.nioneo.store.RecordStore;
 
-public abstract class DynamicRecordCheck
+public class DynamicRecordCheck
         implements RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport>,
         ComparativeRecordChecker<DynamicRecord, DynamicRecord, ConsistencyReport.DynamicConsistencyReport>
 {
-    public static class StringRecordCheck extends DynamicRecordCheck
+    public enum StoreDereference
     {
-        public StringRecordCheck( DynamicStringStore store )
+        STRING
         {
-            super( store.getRecordSize() - store.getRecordHeaderSize() );
-        }
-
-        @Override
-        RecordReference<DynamicRecord> lookup( RecordReferencer records, long block )
+            @Override
+            RecordReference<DynamicRecord> lookup( RecordReferencer records, long block )
+            {
+                return records.string( block );
+            }
+        },
+        ARRAY
         {
-            return records.string( block );
-        }
-    }
-
-    public static class ArrayRecordCheck extends DynamicRecordCheck
-    {
-        public ArrayRecordCheck( DynamicArrayStore store )
+            @Override
+            RecordReference<DynamicRecord> lookup( RecordReferencer records, long block )
+            {
+                return records.array( block );
+            }
+        },
+        PROPERTY_KEY
         {
-            super( store.getRecordSize() - store.getRecordHeaderSize() );
-        }
-
-        @Override
-        RecordReference<DynamicRecord> lookup( RecordReferencer records, long block )
+            @Override
+            RecordReference<DynamicRecord> lookup( RecordReferencer records, long block )
+            {
+                return records.propertyKeyName( (int) block );
+            }
+        },
+        RELATIONSHIP_LABEL
         {
-            return records.array( block );
-        }
+            @Override
+            RecordReference<DynamicRecord> lookup( RecordReferencer records, long block )
+            {
+                return records.relationshipLabelName( (int) block );
+            }
+        };
+        abstract RecordReference<DynamicRecord> lookup(RecordReferencer records, long block);
     }
 
     private final int blockSize;
+    private final StoreDereference dereference;
 
-    private DynamicRecordCheck( int blockSize )
+    public DynamicRecordCheck( RecordStore<DynamicRecord> store, StoreDereference dereference )
     {
-        this.blockSize = blockSize;
-    }
-
-    @Override
-    public ConsistencyReport.DynamicConsistencyReport report( ConsistencyReport.Reporter reporter,
-                                                              DynamicRecord record )
-    {
-        return reporter.forDynamicBlock( record );
+        this.blockSize = store.getRecordSize() - store.getRecordHeaderSize();
+        this.dereference = dereference;
     }
 
     @Override
@@ -77,7 +80,14 @@ public abstract class DynamicRecordCheck
         }
         if ( !Record.NO_NEXT_BLOCK.is( record.getNextBlock() ) )
         {
-            report.forReference( lookup( records, record.getNextBlock() ), this );
+            if ( record.getNextBlock() == record.getId() )
+            {
+                report.selfReferentialNext();
+            }
+            else
+            {
+                report.forReference( dereference.lookup( records, record.getNextBlock() ), this );
+            }
             if ( record.getLength() < blockSize )
             {
                 report.recordNotFullReferencesNext();
@@ -101,6 +111,4 @@ public abstract class DynamicRecordCheck
             }
         }
     }
-
-    abstract RecordReference<DynamicRecord> lookup( RecordReferencer records, long block );
 }
