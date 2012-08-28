@@ -46,76 +46,29 @@ public class ConsistencyReporter implements InvocationHandler
     private final ReferenceDispatcher dispatcher;
     private final StringLogger logger;
     private final AbstractBaseRecord record;
+    private int errors, warnings;
 
-    private ConsistencyReporter( ReferenceDispatcher dispatcher, StringLogger logger,
-                                 AbstractBaseRecord record )
+    private ConsistencyReporter( ReferenceDispatcher dispatcher, StringLogger logger, AbstractBaseRecord record )
     {
         this.dispatcher = dispatcher;
         this.logger = logger;
         this.record = record;
     }
 
-    public static ConsistencyReport.Reporter create( RecordAccess access, final ReferenceDispatcher dispatcher,
-                                                     final StringLogger logger )
+    public static SummarisingReporter create( RecordAccess access, final ReferenceDispatcher dispatcher,
+                                              final StringLogger logger )
     {
-        final RecordReferencer records = new RecordReferencer( access );
-        return new ConsistencyReport.Reporter()
-        {
-            private <RECORD extends AbstractBaseRecord, REPORT extends ConsistencyReport<RECORD, REPORT>>
-            REPORT reporter( Class<REPORT> type, RECORD record )
-            {
-                return proxy( type, new ConsistencyReporter( dispatcher, logger, record ) );
-            }
+        return new SummarisingReporter( dispatcher, logger, new RecordReferencer( access ) );
+    }
 
-            @Override
-            public void forNode( NodeRecord node,
-                                 RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> checker )
-            {
-                checker.check( node, reporter( ConsistencyReport.NodeConsistencyReport.class, node ), records );
-            }
-
-            @Override
-            public void forRelationship( RelationshipRecord relationship,
-                                         RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> checker )
-            {
-                checker.check( relationship,
-                               reporter( ConsistencyReport.RelationshipConsistencyReport.class, relationship ),
-                               records );
-            }
-
-            @Override
-            public void forProperty( PropertyRecord property,
-                                     RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> checker )
-            {
-                checker.check( property, reporter( ConsistencyReport.PropertyConsistencyReport.class, property ),
-                               records );
-            }
-
-            @Override
-            public void forRelationshipLabel( RelationshipTypeRecord label,
-                                              RecordCheck<RelationshipTypeRecord, ConsistencyReport.LabelConsistencyReport> checker )
-            {
-                checker.check( label, reporter( ConsistencyReport.LabelConsistencyReport.class, label ), records );
-            }
-
-            @Override
-            public void forPropertyKey( PropertyIndexRecord key,
-                                        RecordCheck<PropertyIndexRecord, ConsistencyReport.PropertyKeyConsistencyReport> checker )
-            {
-                checker.check( key, reporter( ConsistencyReport.PropertyKeyConsistencyReport.class, key ), records );
-            }
-
-            @Override
-            public void forDynamicBlock( DynamicRecord record,
-                                         RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport> checker )
-            {
-                checker.check( record, reporter( ConsistencyReport.DynamicConsistencyReport.class, record ), records );
-            }
-        };
+    private void update( ConsistencySummaryStats summary )
+    {
+        summary.add( record.getClass(), errors, warnings );
     }
 
     /**
      * Invoked when an inconsistency is encountered.
+     *
      * @param args array of the items referenced from this record with which it is inconsistent.
      */
     @Override
@@ -127,8 +80,17 @@ public class ConsistencyReporter implements InvocationHandler
         }
         else
         {
-            StringBuilder message = new StringBuilder(
-                    method.getAnnotation( ConsistencyReport.Warning.class ) == null ? "ERROR: " : "WARNING: " );
+            StringBuilder message = new StringBuilder();
+            if ( method.getAnnotation( ConsistencyReport.Warning.class ) == null )
+            {
+                errors++;
+                message.append( "ERROR: " );
+            }
+            else
+            {
+                warnings++;
+                message.append( "WARNING: " );
+            }
             message.append( record ).append( ' ' );
             if ( args != null )
             {
@@ -156,5 +118,75 @@ public class ConsistencyReporter implements InvocationHandler
     private static <T> T proxy( Class<T> type, InvocationHandler handler )
     {
         return type.cast( newProxyInstance( ConsistencyReporter.class.getClassLoader(), new Class[]{type}, handler ) );
+    }
+
+    public static class SummarisingReporter implements ConsistencyReport.Reporter
+    {
+        private final ReferenceDispatcher dispatcher;
+        private final StringLogger logger;
+        private final RecordReferencer records;
+        private final ConsistencySummaryStats summary = new ConsistencySummaryStats();
+
+        private SummarisingReporter( ReferenceDispatcher dispatcher, StringLogger logger, RecordReferencer records )
+        {
+            this.dispatcher = dispatcher;
+            this.logger = logger;
+            this.records = records;
+        }
+
+        public ConsistencySummaryStats getSummary()
+        {
+            return summary;
+        }
+
+        private <RECORD extends AbstractBaseRecord, REPORT extends ConsistencyReport<RECORD,REPORT>>
+        void dispatch(Class<REPORT> reportType, RECORD record, RecordCheck<RECORD,REPORT> checker)
+        {
+            ConsistencyReporter handler = new ConsistencyReporter( dispatcher, logger, record );
+            checker.check( record, proxy( reportType, handler ), records );
+            handler.update( summary );
+        }
+
+        @Override
+        public void forNode( NodeRecord node,
+                             RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> checker )
+        {
+            dispatch( ConsistencyReport.NodeConsistencyReport.class, node, checker );
+        }
+
+        @Override
+        public void forRelationship( RelationshipRecord relationship,
+                                     RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> checker )
+        {
+            dispatch( ConsistencyReport.RelationshipConsistencyReport.class, relationship, checker );
+        }
+
+        @Override
+        public void forProperty( PropertyRecord property,
+                                 RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> checker )
+        {
+            dispatch( ConsistencyReport.PropertyConsistencyReport.class, property, checker );
+        }
+
+        @Override
+        public void forRelationshipLabel( RelationshipTypeRecord label,
+                                          RecordCheck<RelationshipTypeRecord, ConsistencyReport.LabelConsistencyReport> checker )
+        {
+            dispatch( ConsistencyReport.LabelConsistencyReport.class, label, checker );
+        }
+
+        @Override
+        public void forPropertyKey( PropertyIndexRecord key,
+                                    RecordCheck<PropertyIndexRecord, ConsistencyReport.PropertyKeyConsistencyReport> checker )
+        {
+            dispatch( ConsistencyReport.PropertyKeyConsistencyReport.class, key, checker );
+        }
+
+        @Override
+        public void forDynamicBlock( DynamicRecord record,
+                                     RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport> checker )
+        {
+            dispatch( ConsistencyReport.DynamicConsistencyReport.class, record, checker );
+        }
     }
 }

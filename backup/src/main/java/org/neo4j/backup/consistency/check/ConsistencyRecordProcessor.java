@@ -1,13 +1,32 @@
 package org.neo4j.backup.consistency.check;
 
-import static org.neo4j.backup.consistency.InconsistencyType.PropertyBlockInconsistency.BlockInconsistencyType
-        .DYNAMIC_NOT_IN_USE;
-import static org.neo4j.backup.consistency.InconsistencyType.PropertyBlockInconsistency.BlockInconsistencyType
-        .ILLEGAL_PROPERTY_TYPE;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
+import org.neo4j.backup.consistency.RelationshipChainField;
+import org.neo4j.backup.consistency.RelationshipNodeField;
+import org.neo4j.backup.consistency.store.DiffRecordStore;
+import org.neo4j.helpers.Progress;
+import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
+import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
+import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
+import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
+import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
+import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
+import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
+import org.neo4j.kernel.impl.nioneo.store.PropertyType;
+import org.neo4j.kernel.impl.nioneo.store.Record;
+import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
+import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
+import org.neo4j.kernel.impl.nioneo.store.StoreAccess;
+
+import static org.neo4j.backup.consistency.InconsistencyType.PropertyBlockInconsistency.BlockInconsistencyType.DYNAMIC_NOT_IN_USE;
+import static org.neo4j.backup.consistency.InconsistencyType.PropertyBlockInconsistency.BlockInconsistencyType.ILLEGAL_PROPERTY_TYPE;
 import static org.neo4j.backup.consistency.InconsistencyType.PropertyBlockInconsistency.BlockInconsistencyType.INVALID_PROPERTY_KEY;
 import static org.neo4j.backup.consistency.InconsistencyType.PropertyBlockInconsistency.BlockInconsistencyType.UNUSED_PROPERTY_KEY;
-import static org.neo4j.backup.consistency.InconsistencyType.PropertyOwnerInconsistency.OwnerInconsistencyType
-        .MULTIPLE_OWNERS;
+import static org.neo4j.backup.consistency.InconsistencyType.PropertyOwnerInconsistency.OwnerInconsistencyType.MULTIPLE_OWNERS;
 import static org.neo4j.backup.consistency.InconsistencyType.PropertyOwnerInconsistency.OwnerInconsistencyType.PROPERTY_CHANGED_FOR_WRONG_OWNER;
 import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.DYNAMIC_LENGTH_TOO_LARGE;
 import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.INVALID_TYPE_ID;
@@ -27,37 +46,13 @@ import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsiste
 import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.PROPERTY_PREV_WRONG_BACKREFERENCE;
 import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.RELATIONSHIP_FOR_OTHER_NODE;
 import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.RELATIONSHIP_NOT_IN_USE;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency
-        .RELATIONSHIP_NOT_REMOVED_FOR_DELETED_NODE;
+import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.RELATIONSHIP_NOT_REMOVED_FOR_DELETED_NODE;
 import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.REMOVED_PROPERTY_STILL_REFERENCED;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency
-        .REMOVED_RELATIONSHIP_STILL_REFERENCED;
+import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.REMOVED_RELATIONSHIP_STILL_REFERENCED;
 import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.REPLACED_PROPERTY;
 import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.TYPE_NOT_IN_USE;
 import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.UNUSED_KEY_NAME;
 import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.UNUSED_TYPE_NAME;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-
-import org.neo4j.backup.consistency.DiffRecordStore;
-import org.neo4j.backup.consistency.RelationshipChainField;
-import org.neo4j.backup.consistency.RelationshipNodeField;
-import org.neo4j.helpers.Progress;
-import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
-import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
-import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
-import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
-import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyType;
-import org.neo4j.kernel.impl.nioneo.store.Record;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
-import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
-import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
-import org.neo4j.kernel.impl.nioneo.store.StoreAccess;
 
 public class ConsistencyRecordProcessor extends RecordStore.Processor implements Runnable
 {

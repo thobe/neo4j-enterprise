@@ -20,8 +20,6 @@
 
 package org.neo4j.backup;
 
-import static org.neo4j.helpers.collection.MapUtil.stringMap;
-
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
@@ -38,7 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
-import org.neo4j.backup.consistency.check.ConsistencyCheck;
+import org.neo4j.backup.consistency.check.full.FullCheck;
 import org.neo4j.com.RequestContext;
 import org.neo4j.com.RequestContext.Tx;
 import org.neo4j.com.Response;
@@ -50,6 +48,7 @@ import org.neo4j.com.TransactionStream;
 import org.neo4j.com.TxExtractor;
 import org.neo4j.graphdb.factory.GraphDatabaseSetting;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
+import org.neo4j.helpers.Progress;
 import org.neo4j.helpers.ProgressIndicator;
 import org.neo4j.helpers.Triplet;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
@@ -63,6 +62,8 @@ import org.neo4j.kernel.impl.transaction.xaframework.LogIoUtils;
 import org.neo4j.kernel.impl.transaction.xaframework.NoSuchLogVersionException;
 import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
 import org.neo4j.kernel.impl.util.StringLogger;
+
+import static org.neo4j.helpers.collection.MapUtil.stringMap;
 
 public class OnlineBackup
 {
@@ -206,9 +207,9 @@ public class OnlineBackup
             bumpLogFile( targetDirectory, timestamp );
             if ( verification )
             {
-                ConsistencyCheck.run( targetDirectory,
-                                      new Config( new ConfigurationDefaults( GraphDatabaseSettings.class )
-                                                          .apply( stringMap() ) ) );
+                FullCheck.run( Progress.textual( System.err ), targetDirectory, new Config(
+                        new ConfigurationDefaults( GraphDatabaseSettings.class ).apply( stringMap() ) ),
+                               StringLogger.SYSTEM );
             }
         }
         finally

@@ -26,14 +26,14 @@ import java.io.IOException;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.util.DefaultPrettyPrinter;
-import org.neo4j.backup.consistency.check.ConsistencyCheck;
+import org.neo4j.backup.consistency.check.full.FullCheck;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.Progress;
-import org.neo4j.helpers.ProgressIndicator;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.configuration.ConfigurationDefaults;
 import org.neo4j.kernel.impl.util.FileUtils;
+import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.perftest.enterprise.util.Configuration;
 import org.neo4j.perftest.enterprise.util.Parameters;
 import org.neo4j.perftest.enterprise.util.Setting;
@@ -92,10 +92,10 @@ public class ConsistencyPerformanceCheck
         {
             progress = Progress.Factory.NONE;
         }
-        ConsistencyCheck.run( new TimingProgress( new JsonReportWriter( reportFile ), progress ),
-                              configuration.get( DataGenerator.store_dir ),
-                              new Config( new ConfigurationDefaults( GraphDatabaseSettings.class )
-                                                  .apply( stringMap() ) ) );
+        FullCheck.run( new TimingProgress( new JsonReportWriter( reportFile ), progress ),
+                       configuration.get( DataGenerator.store_dir ),
+                       new Config( new ConfigurationDefaults( GraphDatabaseSettings.class ).apply( stringMap() ) ),
+                       StringLogger.DEV_NULL );
     }
 
     private static class JsonReportWriter implements TimingProgress.Visitor

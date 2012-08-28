@@ -1,4 +1,4 @@
-package org.neo4j.backup.consistency;
+package org.neo4j.backup.consistency.check.full;
 
 import java.io.StringWriter;
 
@@ -57,10 +57,11 @@ public class FullCheckIntegrationTest
     {
         // given
         StringWriter writer = new StringWriter();
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE, StringLogger.wrap( writer ) );
+        StringLogger logger = StringLogger.wrap( writer );
+        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
 
         // when
-        check.execute( fixture.storeAccess() );
+        check.execute( fixture.storeAccess(), logger );
 
         // then
         assertEquals( "", writer.toString() );
@@ -82,10 +83,11 @@ public class FullCheckIntegrationTest
             }
         } );
         StringWriter writer = new StringWriter();
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE, StringLogger.wrap( writer ) );
+        StringLogger logger = StringLogger.wrap( writer );
+        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
 
         // when
-        check.execute( fixture.storeAccess() );
+        check.execute( fixture.storeAccess(), logger );
 
         // then
         String logged = writer.toString();
@@ -109,10 +111,11 @@ public class FullCheckIntegrationTest
             }
         } );
         StringWriter writer = new StringWriter();
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE, StringLogger.wrap( writer ) );
+        StringLogger logger = StringLogger.wrap( writer );
+        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
 
         // when
-        check.execute( fixture.storeAccess() );
+        check.execute( fixture.storeAccess(), logger );
 
         // then
         String logged = writer.toString();
@@ -142,10 +145,11 @@ public class FullCheckIntegrationTest
             }
         } );
         StringWriter writer = new StringWriter();
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE, StringLogger.wrap( writer ) );
+        StringLogger logger = StringLogger.wrap( writer );
+        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
 
         // when
-        check.execute( fixture.storeAccess() );
+        check.execute( fixture.storeAccess(), logger );
 
         // then
         String logged = writer.toString();
@@ -183,10 +187,11 @@ public class FullCheckIntegrationTest
             }
         } );
         StringWriter writer = new StringWriter();
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE, StringLogger.wrap( writer ) );
+        StringLogger logger = StringLogger.wrap( writer );
+        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
 
         // when
-        check.execute( fixture.storeAccess() );
+        check.execute( fixture.storeAccess(), logger );
 
         // then
         String logged = writer.toString();
@@ -224,10 +229,11 @@ public class FullCheckIntegrationTest
             }
         } );
         StringWriter writer = new StringWriter();
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE, StringLogger.wrap( writer ) );
+        StringLogger logger = StringLogger.wrap( writer );
+        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
 
         // when
-        check.execute( fixture.storeAccess() );
+        check.execute( fixture.storeAccess(), logger );
 
         // then
         String logged = writer.toString();
@@ -256,10 +262,11 @@ public class FullCheckIntegrationTest
         access.getTypeNameStore().updateRecord( record );
 
         StringWriter writer = new StringWriter();
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE, StringLogger.wrap( writer ) );
+        StringLogger logger = StringLogger.wrap( writer );
+        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
 
         // when
-        check.execute( access );
+        check.execute( access, logger );
 
         // then
         String logged = writer.toString();
@@ -288,10 +295,11 @@ public class FullCheckIntegrationTest
         access.getPropertyKeyStore().updateRecord( record );
 
         StringWriter writer = new StringWriter();
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE, StringLogger.wrap( writer ) );
+        StringLogger logger = StringLogger.wrap( writer );
+        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
 
         // when
-        check.execute( access );
+        check.execute( access, logger );
 
         // then
         String logged = writer.toString();
@@ -310,10 +318,11 @@ public class FullCheckIntegrationTest
         access.getRelationshipTypeStore().updateRecord( record );
 
         StringWriter writer = new StringWriter();
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE, StringLogger.wrap( writer ) );
+        StringLogger logger = StringLogger.wrap( writer );
+        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
 
         // when
-        check.execute( access );
+        check.execute( access, logger );
 
         // then
         String logged = writer.toString();
@@ -342,10 +351,11 @@ public class FullCheckIntegrationTest
         access.getPropertyKeyStore().updateRecord( record );
 
         StringWriter writer = new StringWriter();
-        FullCheck check = new FullCheck( true, Progress.Factory.NONE, StringLogger.wrap( writer ) );
+        StringLogger logger = StringLogger.wrap( writer );
+        FullCheck check = new FullCheck( true, Progress.Factory.NONE );
 
         // when
-        check.execute( access );
+        check.execute( access, logger );
 
         // then
         String logged = writer.toString();
