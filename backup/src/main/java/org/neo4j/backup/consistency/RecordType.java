@@ -1,0 +1,9 @@
+package org.neo4j.backup.consistency;
+
+public enum RecordType
+{
+    NODE, RELATIONSHIP, PROPERTY,
+    PROPERTY_KEY, RELATIONSHIP_LABEL,
+    STRING_PROPERTY, ARRAY_PROPERTY,
+    RELATIONSHIP_LABEL_NAME, PROPERTY_KEY_NAME,
+}

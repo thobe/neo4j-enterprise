@@ -2,6 +2,7 @@ package org.neo4j.backup.consistency.check.full;
 
 import org.junit.Rule;
 import org.junit.Test;
+import org.neo4j.backup.consistency.RecordType;
 import org.neo4j.backup.consistency.report.ConsistencyReporter;
 import org.neo4j.backup.consistency.report.ConsistencySummaryStats;
 import org.neo4j.backup.consistency.store.DirectReferenceDispatcher;
@@ -11,11 +12,9 @@ import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.helpers.Progress;
 import org.neo4j.helpers.UTF8;
-import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
-import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyType;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
@@ -68,11 +67,11 @@ public class FullCheckIntegrationTest
         return reporter.getSummary();
     }
 
-    private void verifyInconsistency( Class<? extends AbstractBaseRecord> recordType, ConsistencySummaryStats stats )
+    private void verifyInconsistency( RecordType recordType, ConsistencySummaryStats stats )
     {
         int count = stats.getInconsistencyCountForRecordType( recordType );
-        assertTrue( "Expected inconsistencies for records of type: " + recordType.getSimpleName(), count > 0 );
-        assertEquals( "Expected only inconsistencies of type: " + recordType.getSimpleName(),
+        assertTrue( "Expected inconsistencies for records of type: " + recordType, count > 0 );
+        assertEquals( "Expected only inconsistencies of type: " + recordType,
                       count, stats.getTotalInconsistencyCount() );
     }
 
@@ -90,15 +89,13 @@ public class FullCheckIntegrationTest
     public void shouldReportNodeInconsistencies() throws Exception
     {
         // given
-        final Reference<Long> inconsistentNode = new Reference<Long>();
         fixture.apply( new GraphStoreFixture.Transaction()
         {
             @Override
             protected void transactionData( GraphStoreFixture.TransactionDataBuilder tx,
                                             GraphStoreFixture.IdGenerator next )
             {
-                inconsistentNode.set( next.node() );
-                tx.create( new NodeRecord( inconsistentNode.get(), next.relationship(), -1 ) );
+                tx.create( new NodeRecord( next.node(), next.relationship(), -1 ) );
             }
         } );
 
@@ -106,22 +103,20 @@ public class FullCheckIntegrationTest
         ConsistencySummaryStats stats = check();
 
         // then
-        verifyInconsistency( NodeRecord.class, stats );
+        verifyInconsistency( RecordType.NODE, stats );
     }
 
     @Test
     public void shouldReportRelationshipInconsistencies() throws Exception
     {
         // given
-        final Reference<Long> inconsistentRelationship = new Reference<Long>();
         fixture.apply( new GraphStoreFixture.Transaction()
         {
             @Override
             protected void transactionData( GraphStoreFixture.TransactionDataBuilder tx,
                                             GraphStoreFixture.IdGenerator next )
             {
-                inconsistentRelationship.set( next.relationship() );
-                tx.create( new RelationshipRecord( inconsistentRelationship.get(), 1, 2, 0 ) );
+                tx.create( new RelationshipRecord( next.relationship(), 1, 2, 0 ) );
             }
         } );
 
@@ -129,24 +124,21 @@ public class FullCheckIntegrationTest
         ConsistencySummaryStats stats = check();
 
         // then
-        verifyInconsistency( RelationshipRecord.class, stats );
+        verifyInconsistency( RecordType.RELATIONSHIP, stats );
     }
 
     @Test
     public void shouldReportPropertyInconsistencies() throws Exception
     {
         // given
-        final Reference<Long> inconsistentProperty = new Reference<Long>();
         fixture.apply( new GraphStoreFixture.Transaction()
         {
             @Override
             protected void transactionData( GraphStoreFixture.TransactionDataBuilder tx,
                                             GraphStoreFixture.IdGenerator next )
             {
-                inconsistentProperty.set( next.property() );
-                PropertyRecord property = new PropertyRecord( inconsistentProperty.get() );
+                PropertyRecord property = new PropertyRecord( next.property() );
                 property.setPrevProp( next.property() );
-                property.setNextProp( next.property() );
                 PropertyBlock block = new PropertyBlock();
                 block.setSingleBlock( 1 | (((long) PropertyType.INT.intValue()) << 24) | (666 << 28) );
                 property.addPropertyBlock( block );
@@ -158,22 +150,20 @@ public class FullCheckIntegrationTest
         ConsistencySummaryStats stats = check();
 
         // then
-        verifyInconsistency( PropertyRecord.class, stats );
+        verifyInconsistency( RecordType.PROPERTY, stats );
     }
 
     @Test
     public void shouldReportStringPropertyInconsistencies() throws Exception
     {
         // given
-        final Reference<Long> inconsistentString = new Reference<Long>();
         fixture.apply( new GraphStoreFixture.Transaction()
         {
             @Override
             protected void transactionData( GraphStoreFixture.TransactionDataBuilder tx,
                                             GraphStoreFixture.IdGenerator next )
             {
-                inconsistentString.set( next.stringProperty() );
-                DynamicRecord string = new DynamicRecord( inconsistentString.get() );
+                DynamicRecord string = new DynamicRecord( next.stringProperty() );
                 string.setInUse( true );
                 string.setCreated();
                 string.setType( PropertyType.STRING.intValue() );
@@ -195,22 +185,20 @@ public class FullCheckIntegrationTest
         ConsistencySummaryStats stats = check();
 
         // then
-        verifyInconsistency( DynamicRecord.class, stats );
+        verifyInconsistency( RecordType.STRING_PROPERTY, stats );
     }
 
     @Test
     public void shouldReportArrayPropertyInconsistencies() throws Exception
     {
         // given
-        final Reference<Long> inconsistentArray = new Reference<Long>();
         fixture.apply( new GraphStoreFixture.Transaction()
         {
             @Override
             protected void transactionData( GraphStoreFixture.TransactionDataBuilder tx,
                                             GraphStoreFixture.IdGenerator next )
             {
-                inconsistentArray.set( next.arrayProperty() );
-                DynamicRecord array = new DynamicRecord( inconsistentArray.get() );
+                DynamicRecord array = new DynamicRecord( next.arrayProperty() );
                 array.setInUse( true );
                 array.setCreated();
                 array.setType( PropertyType.ARRAY.intValue() );
@@ -232,7 +220,7 @@ public class FullCheckIntegrationTest
         ConsistencySummaryStats stats = check();
 
         // then
-        verifyInconsistency( DynamicRecord.class, stats );
+        verifyInconsistency( RecordType.ARRAY_PROPERTY, stats );
     }
 
     @Test
@@ -259,7 +247,7 @@ public class FullCheckIntegrationTest
         ConsistencySummaryStats stats = check( access );
 
         // then
-        verifyInconsistency( DynamicRecord.class, stats );
+        verifyInconsistency( RecordType.RELATIONSHIP_LABEL_NAME, stats );
     }
 
     @Test
@@ -286,7 +274,7 @@ public class FullCheckIntegrationTest
         ConsistencySummaryStats stats = check( access );
 
         // then
-        verifyInconsistency( DynamicRecord.class, stats );
+        verifyInconsistency( RecordType.PROPERTY_KEY_NAME, stats );
     }
 
     @Test
@@ -303,7 +291,7 @@ public class FullCheckIntegrationTest
         ConsistencySummaryStats stats = check( access );
 
         // then
-        verifyInconsistency( RelationshipTypeRecord.class, stats );
+        verifyInconsistency( RecordType.RELATIONSHIP_LABEL, stats );
     }
 
     @Test
@@ -330,7 +318,7 @@ public class FullCheckIntegrationTest
         ConsistencySummaryStats stats = check( access );
 
         // then
-        verifyInconsistency( PropertyIndexRecord.class, stats );
+        verifyInconsistency( RecordType.PROPERTY_KEY, stats );
     }
 
     private static class Reference<T>

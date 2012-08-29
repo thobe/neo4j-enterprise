@@ -1,6 +1,7 @@
 package org.neo4j.backup.log;
 
-import org.neo4j.backup.consistency.check.incremental.IncrementalCheck;
+import org.neo4j.backup.consistency.check.incremental.DiffCheck;
+import org.neo4j.backup.consistency.check.incremental.FullDiffCheck;
 import org.neo4j.helpers.Service;
 import org.neo4j.kernel.impl.transaction.xaframework.TransactionInterceptorProvider;
 import org.neo4j.kernel.impl.util.StringLogger;
@@ -16,12 +17,12 @@ public class VerifyingTransactionInterceptorProvider extends CheckingTransaction
     }
 
     @Override
-    IncrementalCheck createChecker( String mode, StringLogger logger )
+    DiffCheck createChecker( String mode, StringLogger logger )
     {
-        if ( !"true".equalsIgnoreCase( mode ) )
+        if ( "true".equalsIgnoreCase( mode ) )
         {
-            return null;
+            return new FullDiffCheck( logger );
         }
-        return new IncrementalCheck( logger );
+        return null;
     }
 }

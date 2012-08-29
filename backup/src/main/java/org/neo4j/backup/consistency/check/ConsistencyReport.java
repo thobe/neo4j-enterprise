@@ -5,6 +5,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import org.neo4j.backup.consistency.RecordType;
 import org.neo4j.backup.consistency.store.RecordReference;
 import org.neo4j.kernel.impl.annotations.Documented;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
@@ -42,7 +43,7 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
         void forPropertyKey( PropertyIndexRecord key,
                              RecordCheck<PropertyIndexRecord, PropertyKeyConsistencyReport> checker );
 
-        void forDynamicBlock( DynamicRecord record,
+        void forDynamicBlock( RecordType type, DynamicRecord record,
                               RecordCheck<DynamicRecord, DynamicConsistencyReport> checker );
     }
 

@@ -4,7 +4,7 @@ import java.io.File;
 
 import org.neo4j.backup.consistency.ConsistencyCheckingError;
 import org.neo4j.backup.consistency.check.InconsistentStoreException;
-import org.neo4j.backup.consistency.check.incremental.IncrementalCheck;
+import org.neo4j.backup.consistency.check.incremental.DiffCheck;
 import org.neo4j.backup.consistency.store.DiffStore;
 import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
@@ -23,10 +23,10 @@ class CheckingTransactionInterceptor implements TransactionInterceptor
     private LogEntry.Start startEntry;
     private LogEntry.Commit commitEntry;
     private final DiffStore diffs;
-    private final IncrementalCheck checker;
+    private final DiffCheck checker;
     private final StringLogger diffLog;
 
-    CheckingTransactionInterceptor( IncrementalCheck checker, NeoStoreXaDataSource dataSource,
+    CheckingTransactionInterceptor( DiffCheck checker, NeoStoreXaDataSource dataSource,
                                     StringLogger logger, String log )
     {
         StringLogger diffLog = null;

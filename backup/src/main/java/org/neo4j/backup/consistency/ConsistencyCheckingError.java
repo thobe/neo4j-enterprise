@@ -1,7 +1,6 @@
 package org.neo4j.backup.consistency;
 
 import org.neo4j.backup.consistency.report.ConsistencySummaryStats;
-import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.DataInconsistencyError;
 import org.neo4j.kernel.impl.transaction.xaframework.LogEntry;
 
@@ -19,7 +18,7 @@ public class ConsistencyCheckingError extends DataInconsistencyError
         this.summary = summary;
     }
 
-    public int getInconsistencyCountForRecordType( Class<? extends AbstractBaseRecord> recordType )
+    public int getInconsistencyCountForRecordType( RecordType recordType )
     {
         return summary.getInconsistencyCountForRecordType( recordType );
     }

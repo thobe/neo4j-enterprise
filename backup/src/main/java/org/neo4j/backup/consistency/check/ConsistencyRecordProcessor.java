@@ -8,6 +8,7 @@ import org.neo4j.backup.consistency.RelationshipChainField;
 import org.neo4j.backup.consistency.RelationshipNodeField;
 import org.neo4j.backup.consistency.store.DiffRecordStore;
 import org.neo4j.helpers.Progress;
+import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
@@ -133,7 +134,7 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
     }
 
     @Override
-    public void processString( RecordStore<DynamicRecord> store, DynamicRecord string )
+    public void processString( RecordStore<DynamicRecord> store, DynamicRecord string, IdType idType )
     {
         if ( checkDynamic( store, string ) )
         {

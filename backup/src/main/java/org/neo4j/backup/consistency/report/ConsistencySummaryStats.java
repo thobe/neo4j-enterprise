@@ -4,12 +4,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
+import org.neo4j.backup.consistency.RecordType;
 
 public class ConsistencySummaryStats
 {
-    private final ConcurrentMap<Class<? extends AbstractBaseRecord>, AtomicInteger> inconsistentRecordCount =
-            new ConcurrentHashMap<Class<? extends AbstractBaseRecord>, AtomicInteger>();
+    private final ConcurrentMap<RecordType, AtomicInteger> inconsistentRecordCount =
+            new ConcurrentHashMap<RecordType, AtomicInteger>();
     private final AtomicInteger totalInconsistencyCount = new AtomicInteger();
 
     public boolean isConsistent()
@@ -17,7 +17,7 @@ public class ConsistencySummaryStats
         return totalInconsistencyCount.get() == 0;
     }
 
-    public int getInconsistencyCountForRecordType( Class<? extends AbstractBaseRecord> recordType )
+    public int getInconsistencyCountForRecordType( RecordType recordType )
     {
         AtomicInteger counter = inconsistentRecordCount.get( recordType );
         return counter == null ? 0 : counter.get();
@@ -28,7 +28,7 @@ public class ConsistencySummaryStats
         return totalInconsistencyCount.get();
     }
 
-    void add( Class<? extends AbstractBaseRecord> recordType, int errors, int warnings )
+    void add( RecordType recordType, int errors, int warnings )
     {
         if ( errors > 0 )
         {

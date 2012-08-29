@@ -10,15 +10,16 @@ import org.neo4j.backup.consistency.store.SimpleRecordAccess;
 import org.neo4j.helpers.Progress;
 import org.neo4j.kernel.impl.util.StringLogger;
 
-public class IncrementalCheck
+public class FullDiffCheck implements DiffCheck
 {
     private final StringLogger logger;
 
-    public IncrementalCheck( StringLogger logger )
+    public FullDiffCheck( StringLogger logger )
     {
         this.logger = logger;
     }
 
+    @Override
     public void check( DiffStore diffs ) throws InconsistentStoreException
     {
         ConsistencyReporter.SummarisingReporter reporter = ConsistencyReporter

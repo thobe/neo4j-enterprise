@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.InvalidRecordException;
@@ -188,9 +189,9 @@ public class DiffRecordStore<R extends AbstractBaseRecord> implements RecordStor
         }
 
         @Override
-        public void processString( RecordStore<DynamicRecord> store, DynamicRecord string )
+        public void processString( RecordStore<DynamicRecord> store, DynamicRecord string, IdType idType )
         {
-            processor.processString( (RecordStore<DynamicRecord>) diffStore, string );
+            processor.processString( (RecordStore<DynamicRecord>) diffStore, string, idType );
         }
 
         @Override

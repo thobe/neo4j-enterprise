@@ -2,6 +2,7 @@ package org.neo4j.backup.consistency.report;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,6 +17,7 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.model.Statement;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+import org.neo4j.backup.consistency.RecordType;
 import org.neo4j.backup.consistency.check.ConsistencyReport;
 import org.neo4j.backup.consistency.check.RecordCheck;
 import org.neo4j.backup.consistency.store.RecordAccess;
@@ -46,7 +48,7 @@ public class ConsistencyReporterTest implements Answer
         StringBuffer result = new StringBuffer();
         StringLogger logger = StringLogger.wrap( result );
         ConsistencyReport.Reporter reporter = ConsistencyReporter
-                .create( mock( RecordAccess.class ), mock( ReferenceDispatcher.class ), logger );
+        .create( mock( RecordAccess.class ), mock( ReferenceDispatcher.class ), logger );
 
         // when
         reportMethod.invoke( reporter, parameters( reportMethod ) );
@@ -71,7 +73,8 @@ public class ConsistencyReporterTest implements Answer
         ArrayList<Object[]> methods = new ArrayList<Object[]>();
         for ( Method reporterMethod : ConsistencyReport.Reporter.class.getMethods() )
         {
-            ParameterizedType checkerParameter = (ParameterizedType)reporterMethod.getGenericParameterTypes()[1];
+            Type[] parameterTypes = reporterMethod.getGenericParameterTypes();
+            ParameterizedType checkerParameter = (ParameterizedType) parameterTypes[parameterTypes.length - 1];
             Class reportType = (Class) checkerParameter.getActualTypeArguments()[1];
             for ( Method method : reportType.getMethods() )
             {
@@ -136,7 +139,11 @@ public class ConsistencyReporterTest implements Answer
 
     private Object parameter( Class<?> type )
     {
-        if (type == RecordCheck.class)
+        if (type == RecordType.class)
+        {
+            return RecordType.STRING_PROPERTY;
+        }
+        if ( type == RecordCheck.class )
         {
             return mockChecker();
         }
