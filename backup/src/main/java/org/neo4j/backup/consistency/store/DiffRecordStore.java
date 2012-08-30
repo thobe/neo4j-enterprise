@@ -158,6 +158,11 @@ public class DiffRecordStore<R extends AbstractBaseRecord> implements RecordStor
         actual.close();
     }
 
+    public R getChangedRecord( long id )
+    {
+        return diff.get( id );
+    }
+
     @SuppressWarnings( "unchecked" )
     private static class DispatchProcessor extends RecordStore.Processor
     {

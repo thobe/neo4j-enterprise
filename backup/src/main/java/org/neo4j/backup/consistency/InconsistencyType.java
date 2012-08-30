@@ -24,6 +24,7 @@ import java.util.Collection;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 
+@Deprecated
 public interface InconsistencyType
 {
     String message();

@@ -36,7 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
-import org.neo4j.backup.consistency.check.full.FullCheck;
+import org.neo4j.backup.consistency.checking.full.FullCheck;
 import org.neo4j.com.RequestContext;
 import org.neo4j.com.RequestContext.Tx;
 import org.neo4j.com.Response;

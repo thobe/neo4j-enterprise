@@ -1,9 +1,9 @@
 package org.neo4j.backup.log;
 
-import org.neo4j.backup.consistency.check.InconsistentStoreException;
-import org.neo4j.backup.consistency.check.incremental.DiffCheck;
-import org.neo4j.backup.consistency.check.incremental.FullDiffCheck;
-import org.neo4j.backup.consistency.check.incremental.IncrementalDiffCheck;
+import org.neo4j.backup.consistency.checking.InconsistentStoreException;
+import org.neo4j.backup.consistency.checking.incremental.DiffCheck;
+import org.neo4j.backup.consistency.checking.incremental.FullDiffCheck;
+import org.neo4j.backup.consistency.checking.incremental.IncrementalDiffCheck;
 import org.neo4j.backup.consistency.store.DiffStore;
 import org.neo4j.helpers.Service;
 import org.neo4j.kernel.impl.transaction.xaframework.TransactionInterceptorProvider;

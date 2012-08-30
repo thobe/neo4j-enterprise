@@ -26,7 +26,7 @@ import java.io.IOException;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.util.DefaultPrettyPrinter;
-import org.neo4j.backup.consistency.check.full.FullCheck;
+import org.neo4j.backup.consistency.checking.full.FullCheck;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.Progress;
 import org.neo4j.kernel.EmbeddedGraphDatabase;

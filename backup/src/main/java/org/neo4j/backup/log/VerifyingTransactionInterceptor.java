@@ -23,9 +23,9 @@ import java.io.File;
 import java.util.Map;
 
 import org.neo4j.backup.consistency.InconsistencyType;
-import org.neo4j.backup.consistency.check.ConsistencyRecordProcessor;
-import org.neo4j.backup.consistency.check.ConsistencyReporter;
-import org.neo4j.backup.consistency.check.MonitoringConsistencyReporter;
+import org.neo4j.backup.consistency.checking.ConsistencyReporter;
+import org.neo4j.backup.consistency.checking.MonitoringConsistencyReporter;
+import org.neo4j.backup.consistency.checking.full.ConsistencyRecordProcessor;
 import org.neo4j.backup.consistency.store.DiffRecordStore;
 import org.neo4j.backup.consistency.store.DiffStore;
 import org.neo4j.helpers.collection.Visitor;
@@ -44,6 +44,7 @@ import org.neo4j.kernel.impl.transaction.xaframework.TransactionInterceptor;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.impl.util.StringLogger.LineLogger;
 
+@Deprecated
 class VerifyingTransactionInterceptor implements TransactionInterceptor
 {
     enum CheckerMode

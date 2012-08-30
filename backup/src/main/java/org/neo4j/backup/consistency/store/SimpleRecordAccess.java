@@ -70,4 +70,34 @@ public class SimpleRecordAccess implements RecordAccess
     {
         return access.getPropertyKeyStore().forceGetRecord( id );
     }
+
+    @Override
+    public NodeRecord changedNode( long id )
+    {
+        return access instanceof DiffStore ? ((DiffStore) access).getNodeStore().getChangedRecord( id ) : null;
+    }
+
+    @Override
+    public RelationshipRecord changedRelationship( long id )
+    {
+        return access instanceof DiffStore ? ((DiffStore) access).getRelationshipStore().getChangedRecord( id ) : null;
+    }
+
+    @Override
+    public PropertyRecord changedProperty( long id )
+    {
+        return access instanceof DiffStore ? ((DiffStore) access).getPropertyStore().getChangedRecord( id ) : null;
+    }
+
+    @Override
+    public DynamicRecord changedString( long id )
+    {
+        return access instanceof DiffStore ? ((DiffStore) access).getStringStore().getChangedRecord( id ) : null;
+    }
+
+    @Override
+    public DynamicRecord changedArray( long id )
+    {
+        return access instanceof DiffStore ? ((DiffStore) access).getArrayStore().getChangedRecord( id ) : null;
+    }
 }

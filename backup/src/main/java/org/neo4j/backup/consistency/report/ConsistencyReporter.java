@@ -4,9 +4,8 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 
 import org.neo4j.backup.consistency.RecordType;
-import org.neo4j.backup.consistency.check.ComparativeRecordChecker;
-import org.neo4j.backup.consistency.check.ConsistencyReport;
-import org.neo4j.backup.consistency.check.RecordCheck;
+import org.neo4j.backup.consistency.checking.ComparativeRecordChecker;
+import org.neo4j.backup.consistency.checking.RecordCheck;
 import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.backup.consistency.store.RecordReference;
 import org.neo4j.backup.consistency.store.RecordReferencer;
@@ -65,7 +64,7 @@ public class ConsistencyReporter implements InvocationHandler
         return new SummarisingReporter( dispatcher, logger, new RecordReferencer( access ) );
     }
 
-    private void update( ConsistencySummaryStats summary )
+    private void update( ConsistencySummaryStatistics summary )
     {
         summary.add( type, errors, warnings );
     }
@@ -129,7 +128,7 @@ public class ConsistencyReporter implements InvocationHandler
         private final ReferenceDispatcher dispatcher;
         private final StringLogger logger;
         private final RecordReferencer records;
-        private final ConsistencySummaryStats summary = new ConsistencySummaryStats();
+        private final ConsistencySummaryStatistics summary = new ConsistencySummaryStatistics();
 
         private SummarisingReporter( ReferenceDispatcher dispatcher, StringLogger logger, RecordReferencer records )
         {
@@ -138,7 +137,7 @@ public class ConsistencyReporter implements InvocationHandler
             this.records = records;
         }
 
-        public ConsistencySummaryStats getSummary()
+        public ConsistencySummaryStatistics getSummary()
         {
             return summary;
         }

@@ -1,7 +1,7 @@
 package org.neo4j.backup.consistency.store;
 
-import org.neo4j.backup.consistency.check.ComparativeRecordChecker;
-import org.neo4j.backup.consistency.check.ConsistencyReport;
+import org.neo4j.backup.consistency.checking.ComparativeRecordChecker;
+import org.neo4j.backup.consistency.report.ConsistencyReport;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 
 public interface ReferenceDispatcher

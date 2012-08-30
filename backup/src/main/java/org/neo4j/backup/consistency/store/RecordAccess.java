@@ -26,4 +26,14 @@ public interface RecordAccess
     DynamicRecord getLabelName( int id );
 
     DynamicRecord getKeyName( int id );
+
+    NodeRecord changedNode( long id );
+
+    RelationshipRecord changedRelationship( long id );
+
+    PropertyRecord changedProperty( long id );
+
+    DynamicRecord changedString( long id );
+
+    DynamicRecord changedArray( long id );
 }

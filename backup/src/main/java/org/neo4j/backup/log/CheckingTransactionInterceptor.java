@@ -3,8 +3,8 @@ package org.neo4j.backup.log;
 import java.io.File;
 
 import org.neo4j.backup.consistency.ConsistencyCheckingError;
-import org.neo4j.backup.consistency.check.InconsistentStoreException;
-import org.neo4j.backup.consistency.check.incremental.DiffCheck;
+import org.neo4j.backup.consistency.checking.InconsistentStoreException;
+import org.neo4j.backup.consistency.checking.incremental.DiffCheck;
 import org.neo4j.backup.consistency.store.DiffStore;
 import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;

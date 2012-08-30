@@ -3,7 +3,7 @@ package org.neo4j.backup.log;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.neo4j.backup.consistency.check.incremental.DiffCheck;
+import org.neo4j.backup.consistency.checking.incremental.DiffCheck;
 import org.neo4j.graphdb.DependencyResolver;
 import org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaDataSource;
 import org.neo4j.kernel.impl.transaction.xaframework.TransactionInterceptor;

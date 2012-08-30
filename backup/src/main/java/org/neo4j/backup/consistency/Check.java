@@ -3,7 +3,7 @@ package org.neo4j.backup.consistency;
 import java.io.File;
 import java.io.IOException;
 
-import org.neo4j.backup.consistency.check.full.FullCheck;
+import org.neo4j.backup.consistency.checking.full.FullCheck;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.Args;
 import org.neo4j.helpers.Progress;
