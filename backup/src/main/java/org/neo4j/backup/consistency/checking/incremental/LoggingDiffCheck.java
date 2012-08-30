@@ -19,48 +19,35 @@
  */
 package org.neo4j.backup.consistency.checking.incremental;
 
-import org.neo4j.backup.consistency.checking.InconsistentStoreException;
 import org.neo4j.backup.consistency.checking.full.ConsistencyCheckIncompleteException;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.backup.consistency.report.ConsistencyReporter;
 import org.neo4j.backup.consistency.report.ConsistencySummaryStatistics;
 import org.neo4j.backup.consistency.store.DiffStore;
-import org.neo4j.backup.consistency.store.DirectReferenceDispatcher;
-import org.neo4j.backup.consistency.store.SimpleRecordAccess;
 import org.neo4j.kernel.impl.util.StringLogger;
 
-public abstract class DiffCheck
+public class LoggingDiffCheck extends DiffCheck
 {
-    final StringLogger logger;
+    private final DiffCheck checker;
 
-    public DiffCheck( StringLogger logger )
+    public LoggingDiffCheck( DiffCheck checker, StringLogger logger )
     {
-        this.logger = logger;
+        super( logger );
+        this.checker = checker;
     }
 
-    public final void check( DiffStore diffs ) throws InconsistentStoreException, ConsistencyCheckIncompleteException
+    @Override
+    public void execute( DiffStore diffs, ConsistencyReport.Reporter reporter )
+            throws ConsistencyCheckIncompleteException
     {
-        ConsistencyReporter.SummarisingReporter reporter = ConsistencyReporter
-                .create( new SimpleRecordAccess( diffs ), new DirectReferenceDispatcher(), logger );
-        try
-        {
-            execute( diffs, reporter );
-        }
-        finally
-        {
-            verify( diffs, reporter.getSummary() );
-        }
+        checker.execute( diffs, reporter );
     }
 
-    public abstract void execute( DiffStore diffs, ConsistencyReport.Reporter reporter )
-            throws ConsistencyCheckIncompleteException;
-
-    protected void verify( DiffStore diffs, ConsistencySummaryStatistics summary )
-            throws InconsistentStoreException
+    @Override
+    protected void verify( final DiffStore diffs, ConsistencySummaryStatistics summary )
     {
         if ( !summary.isConsistent() )
         {
-            throw new InconsistentStoreException( summary );
+            logger.logMessage( "Inconsistencies found: " + summary );
         }
     }
 }

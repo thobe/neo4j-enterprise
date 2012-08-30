@@ -1,3 +1,22 @@
+/**
+ * Copyright (c) 2002-2012 "Neo Technology,"
+ * Network Engine for Objects in Lund AB [http://neotechnology.com]
+ *
+ * This file is part of Neo4j.
+ *
+ * Neo4j is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.neo4j.backup.consistency.report;
 
 import java.lang.annotation.ElementType;
@@ -39,20 +58,38 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
         void forNode( NodeRecord node,
                       RecordCheck<NodeRecord, NodeConsistencyReport> checker );
 
+        void forNodeChange( NodeRecord oldNode, NodeRecord newNode,
+                            RecordCheck<NodeRecord, NodeConsistencyReport> checker );
+
         void forRelationship( RelationshipRecord relationship,
                               RecordCheck<RelationshipRecord, RelationshipConsistencyReport> checker );
+
+        void forRelationshipChange( RelationshipRecord oldRelationship, RelationshipRecord newRelationship,
+                                    RecordCheck<RelationshipRecord, RelationshipConsistencyReport> checker );
 
         void forProperty( PropertyRecord property,
                           RecordCheck<PropertyRecord, PropertyConsistencyReport> checker );
 
+        void forPropertyChange( PropertyRecord oldProperty, PropertyRecord newProperty,
+                                RecordCheck<PropertyRecord, PropertyConsistencyReport> checker );
+
         void forRelationshipLabel( RelationshipTypeRecord label,
                                    RecordCheck<RelationshipTypeRecord, LabelConsistencyReport> checker );
+
+        void forRelationshipLabelChange( RelationshipTypeRecord oldLabel, RelationshipTypeRecord newLabel,
+                                         RecordCheck<RelationshipTypeRecord, LabelConsistencyReport> checker );
 
         void forPropertyKey( PropertyIndexRecord key,
                              RecordCheck<PropertyIndexRecord, PropertyKeyConsistencyReport> checker );
 
+        void forPropertyKeyChange( PropertyIndexRecord oldKey, PropertyIndexRecord newKey,
+                                   RecordCheck<PropertyIndexRecord, PropertyKeyConsistencyReport> checker );
+
         void forDynamicBlock( RecordType type, DynamicRecord record,
                               RecordCheck<DynamicRecord, DynamicConsistencyReport> checker );
+
+        void forDynamicBlockChange( RecordType type, DynamicRecord oldRecord, DynamicRecord newRecord,
+                                    RecordCheck<DynamicRecord, DynamicConsistencyReport> checker );
     }
 
     <REFERRED extends AbstractBaseRecord> void forReference( RecordReference<REFERRED> other,
@@ -182,22 +219,22 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
         @Documented
         void targetNextDoesNotReferenceBack( RelationshipRecord relationship );
 
-        /** The previous source relationship record has changed, but the previously referenced record has not been updated. */
+        /** The previous source relationship reference has changed, but the previously referenced record has not been updated. */
         @Documented
         @IncrementalOnly
         void sourcePrevReplacedButNotUpdated();
 
-        /** The next source relationship record has changed, but the previously referenced record has not been updated. */
+        /** The next source relationship reference has changed, but the previously referenced record has not been updated. */
         @Documented
         @IncrementalOnly
         void sourceNextReplacedButNotUpdated();
 
-        /** The previous target relationship record has changed, but the previously referenced record has not been updated. */
+        /** The previous target relationship reference has changed, but the previously referenced record has not been updated. */
         @Documented
         @IncrementalOnly
         void targetPrevReplacedButNotUpdated();
 
-        /** The next target relationship record has changed, but the previously referenced record has not been updated. */
+        /** The next target relationship reference has changed, but the previously referenced record has not been updated. */
         @Documented
         @IncrementalOnly
         void targetNextReplacedButNotUpdated();
@@ -256,6 +293,26 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
         /** This record is first in a property chain, but no Node or Relationship records reference this record. */
         @Documented
         void orphanPropertyChain();
+
+        /** The previous reference has changed, but the referenced record has not been updated. */
+        @Documented
+        @IncrementalOnly
+        void previousReplacedButNotUpdated();
+
+        /** The next reference has changed, but the referenced record has not been updated. */
+        @Documented
+        @IncrementalOnly
+        void nextReplacedButNotUpdated();
+
+        /** The string property is not referenced anymore, but the corresponding block has not been deleted. */
+        @Documented
+        @IncrementalOnly
+        void stringUnreferencedButNotDeleted( PropertyBlock block );
+
+        /** The array property is not referenced anymore, but the corresponding block as not been deleted. */
+        @Documented
+        @IncrementalOnly
+        void arrayUnreferencedButNotDeleted( PropertyBlock block );
     }
 
     interface LabelConsistencyReport extends ConsistencyReport<RelationshipTypeRecord, LabelConsistencyReport>

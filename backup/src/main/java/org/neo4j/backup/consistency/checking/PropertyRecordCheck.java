@@ -1,4 +1,26 @@
+/**
+ * Copyright (c) 2002-2012 "Neo Technology,"
+ * Network Engine for Objects in Lund AB [http://neotechnology.com]
+ *
+ * This file is part of Neo4j.
+ *
+ * Neo4j is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.neo4j.backup.consistency.checking;
+
+import java.util.HashMap;
+import java.util.Map;
 
 import org.neo4j.backup.consistency.report.ConsistencyReport;
 import org.neo4j.backup.consistency.store.DiffRecordReferencer;
@@ -18,6 +40,68 @@ public class PropertyRecordCheck
                              ConsistencyReport.PropertyConsistencyReport report, DiffRecordReferencer records )
     {
         check( newRecord, report, records );
+        if ( oldRecord.inUse() )
+        {
+            for ( RecordField<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> field : PropertyField
+                    .values() )
+            {
+                if ( field.valueFrom( newRecord ) != field.valueFrom( oldRecord ) && !field.isNone( oldRecord ) )
+                {
+                    if ( !field.referencedRecordChanged( records, oldRecord ) )
+                    {
+                        field.reportReplacedButNotUpdated( report );
+                    }
+                }
+            }
+        }
+        Map<Long, PropertyBlock> prevStrings = new HashMap<Long, PropertyBlock>();
+        Map<Long, PropertyBlock> prevArrays = new HashMap<Long, PropertyBlock>();
+        for ( PropertyBlock block : oldRecord.getPropertyBlocks() )
+        {
+            PropertyType type = block.getType();
+            if ( type != null )
+            {
+                switch ( type )
+                {
+                case STRING:
+                    prevStrings.put( block.getSingleValueLong(), block );
+                    break;
+                case ARRAY:
+                    prevArrays.put( block.getSingleValueLong(), block );
+                    break;
+                }
+            }
+        }
+        for ( PropertyBlock block : newRecord.getPropertyBlocks() )
+        {
+            PropertyType type = block.getType();
+            if ( type != null )
+            {
+                switch ( type )
+                {
+                case STRING:
+                    prevStrings.remove( block.getSingleValueLong() );
+                    break;
+                case ARRAY:
+                    prevArrays.remove( block.getSingleValueLong() );
+                    break;
+                }
+            }
+        }
+        for ( PropertyBlock block : prevStrings.values() )
+        {
+            if ( records.changedString( block.getSingleValueLong() ) == null )
+            {
+                report.stringUnreferencedButNotDeleted( block );
+            }
+        }
+        for ( PropertyBlock block : prevArrays.values() )
+        {
+            if ( records.changedArray( block.getSingleValueLong() ) == null )
+            {
+                report.arrayUnreferencedButNotDeleted( block );
+            }
+        }
     }
 
     @Override
@@ -111,6 +195,7 @@ public class PropertyRecordCheck
             @Override
             public void reportReplacedButNotUpdated( ConsistencyReport.PropertyConsistencyReport report )
             {
+                report.previousReplacedButNotUpdated();
             }
         },
         NEXT( Record.NO_NEXT_PROPERTY )
@@ -142,6 +227,7 @@ public class PropertyRecordCheck
             @Override
             public void reportReplacedButNotUpdated( ConsistencyReport.PropertyConsistencyReport report )
             {
+                report.nextReplacedButNotUpdated();
             }
         };
         private final Record NONE;

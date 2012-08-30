@@ -1,3 +1,22 @@
+/**
+ * Copyright (c) 2002-2012 "Neo Technology,"
+ * Network Engine for Objects in Lund AB [http://neotechnology.com]
+ *
+ * This file is part of Neo4j.
+ *
+ * Neo4j is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.neo4j.backup.consistency.checking.full;
 
 import org.junit.Ignore;
@@ -325,8 +344,22 @@ public class PropertyOwnerCheckTest
         }
 
         @Override
+        public void forNodeChange( NodeRecord oldNode, NodeRecord newNode,
+                                   RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker )
+        {
+            throw new UnsupportedOperationException( "not implemented" );
+        }
+
+        @Override
         public void forRelationship( RelationshipRecord relationship,
                                      RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> checker )
+        {
+            throw new UnsupportedOperationException( "not implemented" );
+        }
+
+        @Override
+        public void forRelationshipChange( RelationshipRecord oldRelationship, RelationshipRecord newRelationship,
+                                           RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> checker )
         {
             throw new UnsupportedOperationException( "not implemented" );
         }
@@ -339,8 +372,22 @@ public class PropertyOwnerCheckTest
         }
 
         @Override
+        public void forPropertyChange( PropertyRecord oldProperty, PropertyRecord newProperty,
+                                       RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> checker )
+        {
+            throw new UnsupportedOperationException( "not implemented" );
+        }
+
+        @Override
         public void forRelationshipLabel( RelationshipTypeRecord label,
                                           RecordCheck<RelationshipTypeRecord, ConsistencyReport.LabelConsistencyReport> checker )
+        {
+            throw new UnsupportedOperationException( "not implemented" );
+        }
+
+        @Override
+        public void forRelationshipLabelChange( RelationshipTypeRecord oldLabel, RelationshipTypeRecord newLabel,
+                                                RecordCheck<RelationshipTypeRecord, ConsistencyReport.LabelConsistencyReport> checker )
         {
             throw new UnsupportedOperationException( "not implemented" );
         }
@@ -353,8 +400,22 @@ public class PropertyOwnerCheckTest
         }
 
         @Override
+        public void forPropertyKeyChange( PropertyIndexRecord oldKey, PropertyIndexRecord newKey,
+                                          RecordCheck<PropertyIndexRecord, ConsistencyReport.PropertyKeyConsistencyReport> checker )
+        {
+            throw new UnsupportedOperationException( "not implemented" );
+        }
+
+        @Override
         public void forDynamicBlock( RecordType type, DynamicRecord record,
                                      RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport> checker )
+        {
+            throw new UnsupportedOperationException( "not implemented" );
+        }
+
+        @Override
+        public void forDynamicBlockChange( RecordType type, DynamicRecord oldRecord, DynamicRecord newRecord,
+                                           RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport> checker )
         {
             throw new UnsupportedOperationException( "not implemented" );
         }

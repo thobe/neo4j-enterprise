@@ -1,3 +1,22 @@
+/**
+ * Copyright (c) 2002-2012 "Neo Technology,"
+ * Network Engine for Objects in Lund AB [http://neotechnology.com]
+ *
+ * This file is part of Neo4j.
+ *
+ * Neo4j is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.neo4j.backup.consistency.report;
 
 import java.lang.reflect.Method;
@@ -19,6 +38,7 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.neo4j.backup.consistency.RecordType;
 import org.neo4j.backup.consistency.checking.RecordCheck;
+import org.neo4j.backup.consistency.store.DiffRecordReferencer;
 import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.backup.consistency.store.RecordReferencer;
 import org.neo4j.backup.consistency.store.ReferenceDispatcher;
@@ -47,7 +67,7 @@ public class ConsistencyReporterTest implements Answer
         StringBuffer result = new StringBuffer();
         StringLogger logger = StringLogger.wrap( result );
         ConsistencyReport.Reporter reporter = ConsistencyReporter
-        .create( mock( RecordAccess.class ), mock( ReferenceDispatcher.class ), logger );
+                .create( mock( RecordAccess.class ), mock( ReferenceDispatcher.class ), logger );
 
         // when
         reportMethod.invoke( reporter, parameters( reportMethod ) );
@@ -112,17 +132,23 @@ public class ConsistencyReporterTest implements Answer
     };
 
     @Override
-    public Object answer( InvocationOnMock invocation ) throws Throwable
-    {
-        method.invoke( invocation.getArguments()[1], parameters( method ) );
-        return null;
-    }
-
-    @Override
     public String toString()
     {
-        return String.format( "report.%s(record, RecordCheck( reporter ){ reporter.%s(); })",
-                              reportMethod.getName(), method.getName() );
+
+        return String.format( "report.%s(%s{ reporter.%s(); })",
+                              reportMethod.getName(), signatureOf( reportMethod ), method.getName() );
+    }
+
+    private static String signatureOf( Method reportMethod )
+    {
+        if ( reportMethod.getParameterTypes().length == 2 )
+        {
+            return "record, RecordCheck( reporter )";
+        }
+        else
+        {
+            return "oldRecord, newRecord, RecordCheck( reporter )";
+        }
     }
 
     private Object[] parameters( Method method )
@@ -138,7 +164,7 @@ public class ConsistencyReporterTest implements Answer
 
     private Object parameter( Class<?> type )
     {
-        if (type == RecordType.class)
+        if ( type == RecordType.class )
         {
             return RecordType.STRING_PROPERTY;
         }
@@ -184,7 +210,18 @@ public class ConsistencyReporterTest implements Answer
         doAnswer( this ).when( checker ).check( any( AbstractBaseRecord.class ),
                                                 any( ConsistencyReport.class ),
                                                 any( RecordReferencer.class ) );
+        doAnswer( this ).when( checker ).checkChange( any( AbstractBaseRecord.class ),
+                                                      any( AbstractBaseRecord.class ),
+                                                      any( ConsistencyReport.class ),
+                                                      any( DiffRecordReferencer.class ) );
         return checker;
+    }
+
+    @Override
+    public Object answer( InvocationOnMock invocation ) throws Throwable
+    {
+        Object[] arguments = invocation.getArguments();
+        return method.invoke( arguments[arguments.length-2], parameters( method ) );
     }
 
     private static Matcher<String> containsString( final String substring )

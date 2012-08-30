@@ -17,7 +17,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.backup.consistency.checking.full;
+package org.neo4j.backup.consistency.checking.incremental;
 
 import org.neo4j.backup.consistency.RecordType;
 import org.neo4j.backup.consistency.checking.AbstractStoreProcessor;
@@ -28,8 +28,6 @@ import org.neo4j.backup.consistency.checking.RecordCheck;
 import org.neo4j.backup.consistency.checking.RelationshipLabelRecordCheck;
 import org.neo4j.backup.consistency.checking.RelationshipRecordCheck;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.helpers.progress.ProgressMonitorFactory;
-import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
@@ -41,68 +39,56 @@ import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
 class StoreProcessor extends AbstractStoreProcessor
 {
     private final ConsistencyReport.Reporter report;
-    private final PropertyOwnerCheck ownerCheck;
 
-    StoreProcessor( boolean checkPropertyOwners, ConsistencyReport.Reporter report )
+    StoreProcessor( ConsistencyReport.Reporter report )
     {
-        this( new PropertyOwnerCheck( checkPropertyOwners ), report );
-    }
-
-    private StoreProcessor( PropertyOwnerCheck ownerCheck, ConsistencyReport.Reporter report )
-    {
-        super( ownerCheck.decoratePrimitiveChecker( new NodeRecordCheck() ),
-               ownerCheck.decoratePrimitiveChecker( new RelationshipRecordCheck() ),
-               ownerCheck.decoratePropertyChecker( new PropertyRecordCheck() ),
+        super( new NodeRecordCheck(),
+               new RelationshipRecordCheck(),
+               new PropertyRecordCheck(),
                new PropertyKeyRecordCheck(),
                new RelationshipLabelRecordCheck() );
         this.report = report;
-        this.ownerCheck = ownerCheck;
-    }
-
-    void checkOrphanPropertyChains( ProgressMonitorFactory progressFactory )
-    {
-        ownerCheck.scanForOrphanChains( report, progressFactory );
     }
 
     @Override
     protected void checkNode( RecordStore<NodeRecord> store, NodeRecord node,
                               RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> checker )
     {
-        report.forNode( node, checker );
+        report.forNodeChange( store.forceGetRaw( node ), node, checker );
     }
 
     @Override
     protected void checkRelationship( RecordStore<RelationshipRecord> store, RelationshipRecord rel,
                                       RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> checker )
     {
-        report.forRelationship( rel, checker );
+        report.forRelationshipChange( store.forceGetRaw( rel ), rel, checker );
     }
 
     @Override
     protected void checkProperty( RecordStore<PropertyRecord> store, PropertyRecord property,
                                   RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> checker )
     {
-        report.forProperty( property,checker );
+        report.forPropertyChange( store.forceGetRaw( property ), property, checker );
     }
 
     @Override
-    protected void checkRelationshipLabel( RecordStore<RelationshipTypeRecord> store, RelationshipTypeRecord label,
+    protected void checkRelationshipLabel( RecordStore<RelationshipTypeRecord> store, RelationshipTypeRecord record,
                                            RecordCheck<RelationshipTypeRecord, ConsistencyReport.LabelConsistencyReport> checker )
     {
-        report.forRelationshipLabel( label, checker );
+        report.forRelationshipLabelChange( store.forceGetRaw( record ), record, checker );
     }
 
     @Override
-    protected void checkPropertyIndex( RecordStore<PropertyIndexRecord> store, PropertyIndexRecord key,
+    protected void checkPropertyIndex( RecordStore<PropertyIndexRecord> store, PropertyIndexRecord record,
                                        RecordCheck<PropertyIndexRecord, ConsistencyReport.PropertyKeyConsistencyReport> checker )
     {
-        report.forPropertyKey( key, checker );
+        report.forPropertyKeyChange( store.forceGetRaw( record ), record, checker );
     }
 
     @Override
     protected void checkDynamic( RecordType type, RecordStore<DynamicRecord> store, DynamicRecord string,
                                  RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport> checker )
     {
-        report.forDynamicBlock( type, string, checker );
+        report.forDynamicBlockChange( type, store.forceGetRaw( string ), string, checker );
     }
 }

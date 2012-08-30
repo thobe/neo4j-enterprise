@@ -1,6 +1,24 @@
+/**
+ * Copyright (c) 2002-2012 "Neo Technology,"
+ * Network Engine for Objects in Lund AB [http://neotechnology.com]
+ *
+ * This file is part of Neo4j.
+ *
+ * Neo4j is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.neo4j.backup.consistency.checking;
 
-import org.junit.Ignore;
 import org.junit.Test;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
@@ -9,7 +27,6 @@ import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyType;
 
-import static org.junit.Assert.fail;
 import static org.mockito.Mockito.verify;
 
 public class PropertyRecordCheckTest
@@ -200,63 +217,106 @@ public class PropertyRecordCheckTest
 
     // change checking
 
-    @Ignore
     @Test
     public void shouldNotReportAnythingForConsistentlyChangedProperty() throws Exception
     {
         // given
+        PropertyRecord oldProperty = inUse( new PropertyRecord( 42 ) );
+        oldProperty.setPrevProp( 1 );
+        oldProperty.setNextProp( 2 );
+        PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
+        newProperty.setPrevProp( 11 );
+        newProperty.setNextProp( 12 );
+
+        addChange( inUse( new PropertyRecord( 1 ) ),
+                   notInUse( new PropertyRecord( 1 ) ) );
+        addChange( inUse( new PropertyRecord( 2 ) ),
+                   notInUse( new PropertyRecord( 2 ) ) );
+
+        addChange( notInUse( new PropertyRecord( 11 ) ),
+                   inUse( new PropertyRecord( 11 ) ) ).setNextProp( 42 );
+        addChange( notInUse( new PropertyRecord( 12 ) ),
+                   inUse( new PropertyRecord( 12 ) ) ).setPrevProp( 42 );
 
         // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
 
         // then
-        fail( "needs to be implemented" );
+        verifyOnlyReferenceDispatch( report );
     }
 
-    @Ignore
     @Test
     public void shouldReportPreviousReplacedButNotUpdated() throws Exception
     {
         // given
+        PropertyRecord oldProperty = inUse( new PropertyRecord( 42 ) );
+        oldProperty.setPrevProp( 1 );
+        PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
+        newProperty.setPrevProp( 2 );
+
+        addChange( notInUse( new PropertyRecord( 2 ) ),
+                   inUse( new PropertyRecord( 2 ) ) ).setNextProp( 42 );
 
         // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
 
         // then
-        fail( "needs to be implemented" );
+        verify( report ).previousReplacedButNotUpdated();
+        verifyOnlyReferenceDispatch( report );
     }
 
-    @Ignore
     @Test
     public void shouldReportNextReplacedButNotUpdated() throws Exception
     {
-        // given
+        PropertyRecord oldProperty = inUse( new PropertyRecord( 42 ) );
+        oldProperty.setNextProp( 1 );
+        PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
+        newProperty.setNextProp( 2 );
+
+        addChange( notInUse( new PropertyRecord( 2 ) ),
+                   inUse( new PropertyRecord( 2 ) ) ).setPrevProp( 42 );
 
         // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
 
         // then
-        fail( "needs to be implemented" );
+        verify( report ).nextReplacedButNotUpdated();
+        verifyOnlyReferenceDispatch( report );
     }
 
-    @Ignore
     @Test
-    public void shouldReportStringValueUnreferencedButNotUpdated() throws Exception
+    public void shouldReportStringValueUnreferencedButStillInUse() throws Exception
     {
         // given
+        PropertyRecord oldProperty = inUse( new PropertyRecord( 42 ) );
+        PropertyBlock block = propertyBlock( add( inUse( new PropertyIndexRecord( 1 ) ) ),
+                                             add( string( inUse( new DynamicRecord( 100 ) ) ) ) );
+        oldProperty.addPropertyBlock( block );
+        PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
 
         // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
 
         // then
-        fail( "needs to be implemented" );
+        verify( report ).stringUnreferencedButNotDeleted( block );
+        verifyOnlyReferenceDispatch( report );
     }
 
-    @Ignore
     @Test
-    public void shouldReportArrayValueUnreferencedButNotUpdated() throws Exception
+    public void shouldReportArrayValueUnreferencedButStillInUse() throws Exception
     {
         // given
+        PropertyRecord oldProperty = inUse( new PropertyRecord( 42 ) );
+        PropertyBlock block = propertyBlock( add( inUse( new PropertyIndexRecord( 1 ) ) ),
+                                             add( array( inUse( new DynamicRecord( 100 ) ) ) ) );
+        oldProperty.addPropertyBlock( block );
+        PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
 
         // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
 
         // then
-        fail( "needs to be implemented" );
+        verify( report ).arrayUnreferencedButNotDeleted( block );
+        verifyOnlyReferenceDispatch( report );
     }
 }

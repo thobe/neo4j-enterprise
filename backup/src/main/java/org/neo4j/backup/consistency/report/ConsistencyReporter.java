@@ -1,3 +1,22 @@
+/**
+ * Copyright (c) 2002-2012 "Neo Technology,"
+ * Network Engine for Objects in Lund AB [http://neotechnology.com]
+ *
+ * This file is part of Neo4j.
+ *
+ * Neo4j is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.neo4j.backup.consistency.report;
 
 import java.lang.reflect.InvocationHandler;
@@ -6,9 +25,9 @@ import java.lang.reflect.Method;
 import org.neo4j.backup.consistency.RecordType;
 import org.neo4j.backup.consistency.checking.ComparativeRecordChecker;
 import org.neo4j.backup.consistency.checking.RecordCheck;
+import org.neo4j.backup.consistency.store.DiffRecordReferencer;
 import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.backup.consistency.store.RecordReference;
-import org.neo4j.backup.consistency.store.RecordReferencer;
 import org.neo4j.backup.consistency.store.ReferenceDispatcher;
 import org.neo4j.kernel.impl.annotations.Documented;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
@@ -61,7 +80,7 @@ public class ConsistencyReporter implements InvocationHandler
     public static SummarisingReporter create( RecordAccess access, final ReferenceDispatcher dispatcher,
                                               final StringLogger logger )
     {
-        return new SummarisingReporter( dispatcher, logger, new RecordReferencer( access ) );
+        return new SummarisingReporter( dispatcher, logger, new DiffRecordReferencer( access ) );
     }
 
     private void update( ConsistencySummaryStatistics summary )
@@ -127,10 +146,10 @@ public class ConsistencyReporter implements InvocationHandler
     {
         private final ReferenceDispatcher dispatcher;
         private final StringLogger logger;
-        private final RecordReferencer records;
+        private final DiffRecordReferencer records;
         private final ConsistencySummaryStatistics summary = new ConsistencySummaryStatistics();
 
-        private SummarisingReporter( ReferenceDispatcher dispatcher, StringLogger logger, RecordReferencer records )
+        private SummarisingReporter( ReferenceDispatcher dispatcher, StringLogger logger, DiffRecordReferencer records )
         {
             this.dispatcher = dispatcher;
             this.logger = logger;
@@ -142,11 +161,20 @@ public class ConsistencyReporter implements InvocationHandler
             return summary;
         }
 
-        private <RECORD extends AbstractBaseRecord, REPORT extends ConsistencyReport<RECORD,REPORT>>
-        void dispatch( RecordType type, Class<REPORT> reportType, RECORD record, RecordCheck<RECORD,REPORT> checker)
+        private <RECORD extends AbstractBaseRecord, REPORT extends ConsistencyReport<RECORD, REPORT>>
+        void dispatch( RecordType type, Class<REPORT> reportType, RECORD record, RecordCheck<RECORD, REPORT> checker )
         {
             ConsistencyReporter handler = new ConsistencyReporter( type, dispatcher, logger, record );
             checker.check( record, proxy( reportType, handler ), records );
+            handler.update( summary );
+        }
+
+        private <RECORD extends AbstractBaseRecord, REPORT extends ConsistencyReport<RECORD, REPORT>>
+        void dispatchChange( RecordType type, Class<REPORT> reportType, RECORD oldRecord, RECORD newRecord,
+                             RecordCheck<RECORD, REPORT> checker )
+        {
+            ConsistencyReporter handler = new ConsistencyReporter( type, dispatcher, logger, newRecord );
+            checker.checkChange( oldRecord, newRecord, proxy( reportType, handler ), records );
             handler.update( summary );
         }
 
@@ -158,10 +186,26 @@ public class ConsistencyReporter implements InvocationHandler
         }
 
         @Override
+        public void forNodeChange( NodeRecord oldNode, NodeRecord newNode,
+                                   RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> checker )
+        {
+            dispatchChange( RecordType.NODE, ConsistencyReport.NodeConsistencyReport.class, oldNode, newNode, checker );
+        }
+
+        @Override
         public void forRelationship( RelationshipRecord relationship,
                                      RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> checker )
         {
-            dispatch( RecordType.RELATIONSHIP, ConsistencyReport.RelationshipConsistencyReport.class, relationship, checker );
+            dispatch( RecordType.RELATIONSHIP, ConsistencyReport.RelationshipConsistencyReport.class, relationship,
+                      checker );
+        }
+
+        @Override
+        public void forRelationshipChange( RelationshipRecord oldRelationship, RelationshipRecord newRelationship,
+                                           RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> checker )
+        {
+            dispatchChange( RecordType.RELATIONSHIP, ConsistencyReport.RelationshipConsistencyReport.class,
+                            oldRelationship, newRelationship, checker );
         }
 
         @Override
@@ -172,10 +216,26 @@ public class ConsistencyReporter implements InvocationHandler
         }
 
         @Override
+        public void forPropertyChange( PropertyRecord oldProperty, PropertyRecord newProperty,
+                                       RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> checker )
+        {
+            dispatchChange( RecordType.PROPERTY, ConsistencyReport.PropertyConsistencyReport.class, oldProperty,
+                            newProperty, checker );
+        }
+
+        @Override
         public void forRelationshipLabel( RelationshipTypeRecord label,
                                           RecordCheck<RelationshipTypeRecord, ConsistencyReport.LabelConsistencyReport> checker )
         {
             dispatch( RecordType.RELATIONSHIP_LABEL, ConsistencyReport.LabelConsistencyReport.class, label, checker );
+        }
+
+        @Override
+        public void forRelationshipLabelChange( RelationshipTypeRecord oldLabel, RelationshipTypeRecord newLabel,
+                                                RecordCheck<RelationshipTypeRecord, ConsistencyReport.LabelConsistencyReport> checker )
+        {
+            dispatchChange( RecordType.RELATIONSHIP_LABEL, ConsistencyReport.LabelConsistencyReport.class, oldLabel,
+                            newLabel, checker );
         }
 
         @Override
@@ -186,10 +246,25 @@ public class ConsistencyReporter implements InvocationHandler
         }
 
         @Override
+        public void forPropertyKeyChange( PropertyIndexRecord oldKey, PropertyIndexRecord newKey,
+                                          RecordCheck<PropertyIndexRecord, ConsistencyReport.PropertyKeyConsistencyReport> checker )
+        {
+            dispatchChange( RecordType.PROPERTY_KEY, ConsistencyReport.PropertyKeyConsistencyReport.class, oldKey,
+                            newKey, checker );
+        }
+
+        @Override
         public void forDynamicBlock( RecordType type, DynamicRecord record,
                                      RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport> checker )
         {
             dispatch( type, ConsistencyReport.DynamicConsistencyReport.class, record, checker );
+        }
+
+        @Override
+        public void forDynamicBlockChange( RecordType type, DynamicRecord oldRecord, DynamicRecord newRecord,
+                                           RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport> checker )
+        {
+            dispatchChange( type, ConsistencyReport.DynamicConsistencyReport.class, oldRecord, newRecord, checker );
         }
     }
 }
