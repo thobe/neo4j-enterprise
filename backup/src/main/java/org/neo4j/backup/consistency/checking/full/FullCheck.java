@@ -22,6 +22,8 @@ package org.neo4j.backup.consistency.checking.full;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.neo4j.backup.consistency.report.ConsistencyReport;
@@ -31,8 +33,8 @@ import org.neo4j.backup.consistency.store.DirectReferenceDispatcher;
 import org.neo4j.backup.consistency.store.SimpleRecordAccess;
 import org.neo4j.graphdb.factory.GraphDatabaseSetting;
 import org.neo4j.helpers.progress.Completion;
-import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.helpers.progress.ProgressListener;
+import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.DefaultFileSystemAbstraction;
 import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.DefaultLastCommittedTxIdSetter;
@@ -99,9 +101,9 @@ public class FullCheck
         tasks.add( new StoreProcessorTask<DynamicRecord>( store.getTypeNameStore(), processor, progress ) );
         tasks.add( new StoreProcessorTask<DynamicRecord>( store.getPropertyKeyStore(), processor, progress ) );
 
-        execute( tasks );
-
         Completion completion = progress.build();
+
+        ExecutorService executor = execute( tasks );
 
         try
         {
@@ -112,17 +114,30 @@ public class FullCheck
             processor.stopScanning();
             throw new ConsistencyCheckIncompleteException( e );
         }
+        finally
+        {
+            executor.shutdown();
+            try
+            {
+                executor.awaitTermination( 10, TimeUnit.SECONDS );
+            }
+            catch ( InterruptedException e )
+            {
+                // don't care
+            }
+        }
 
-        // TODO: Make a task for this too
         processor.checkOrphanPropertyChains( progressFactory );
     }
 
-    protected void execute( List<? extends Runnable> tasks )
+    protected ExecutorService execute( List<? extends Runnable> tasks )
     {
+        ExecutorService executor = Executors.newFixedThreadPool( Runtime.getRuntime().availableProcessors() );
         for ( Runnable task : tasks )
         {
-            new Thread( task ).start();
+            executor.submit( task );
         }
+        return executor;
     }
 
     public static void run( ProgressMonitorFactory progressFactory, String storeDir, Config config,
