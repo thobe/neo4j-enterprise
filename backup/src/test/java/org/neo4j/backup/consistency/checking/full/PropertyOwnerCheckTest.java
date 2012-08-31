@@ -10,7 +10,7 @@ import org.neo4j.backup.consistency.report.ConsistencyReport;
 import org.neo4j.backup.consistency.store.DiffRecordReferencer;
 import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.backup.consistency.store.RecordReferencer;
-import org.neo4j.helpers.Progress;
+import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
@@ -245,7 +245,7 @@ public class PropertyOwnerCheckTest
         ConsistencyReport.PropertyConsistencyReport report = mock( ConsistencyReport.PropertyConsistencyReport.class );
 
         // when
-        decorator.scanForOrphanChains( new StubOrphanReporter( report ), Progress.Factory.NONE );
+        decorator.scanForOrphanChains( new StubOrphanReporter( report ), ProgressMonitorFactory.NONE );
 
         // then
         verifyZeroInteractions( originalReport );

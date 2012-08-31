@@ -8,7 +8,8 @@ import org.neo4j.backup.consistency.checking.RecordCheck;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
 import org.neo4j.backup.consistency.store.DiffRecordReferencer;
 import org.neo4j.backup.consistency.store.RecordReferencer;
-import org.neo4j.helpers.Progress;
+import org.neo4j.helpers.progress.ProgressMonitorFactory;
+import org.neo4j.helpers.progress.ProgressListener;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
@@ -81,17 +82,17 @@ class PropertyOwnerCheck
         return checker;
     }
 
-    public void scanForOrphanChains( ConsistencyReport.Reporter report, Progress.Factory progressFactory )
+    public void scanForOrphanChains( ConsistencyReport.Reporter report, ProgressMonitorFactory progressFactory )
     {
         if ( owners != null )
         {
-            Progress progress = progressFactory.singlePart( "Checking for orphan property chains", owners.size() );
+            ProgressListener progressListener = progressFactory.singlePart( "Checking for orphan property chains", owners.size() );
             for ( PropertyOwner owner : owners.values() )
             {
                 owner.checkOphanage( report, REPORT_ORPHAN );
-                progress.add( 1 );
+                progressListener.add( 1 );
             }
-            progress.done();
+            progressListener.done();
         }
     }
 

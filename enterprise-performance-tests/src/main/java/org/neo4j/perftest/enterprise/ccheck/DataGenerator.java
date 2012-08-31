@@ -19,14 +19,14 @@
  */
 package org.neo4j.perftest.enterprise.ccheck;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
 import org.neo4j.graphdb.RelationshipType;
-import org.neo4j.helpers.Progress;
+import org.neo4j.helpers.progress.ProgressMonitorFactory;
+import org.neo4j.helpers.progress.ProgressListener;
 import org.neo4j.kernel.impl.batchinsert.BatchInserter;
 import org.neo4j.kernel.impl.batchinsert.BatchInserterImpl;
 import org.neo4j.perftest.enterprise.util.Configuration;
@@ -180,27 +180,27 @@ public class DataGenerator
 
     public void generateData( BatchInserter batchInserter )
     {
-        Progress.MultiPartBuilder builder = initProgress();
-        Progress nodeProgress = builder.progressForPart( "nodes", nodeCount );
-        Progress relationshipsProgress = builder.progressForPart( "relationships", relationshipCount );
-        builder.complete();
+        ProgressMonitorFactory.MultiPartBuilder builder = initProgress();
+        ProgressListener nodeProgressListener = builder.progressForPart( "nodes", nodeCount );
+        ProgressListener relationshipsProgressListener = builder.progressForPart( "relationships", relationshipCount );
+        builder.build();
 
-        generateNodes( batchInserter, nodeProgress );
-        generateRelationships( batchInserter, relationshipsProgress );
+        generateNodes( batchInserter, nodeProgressListener );
+        generateRelationships( batchInserter, relationshipsProgressListener );
     }
 
-    private void generateNodes( BatchInserter batchInserter, Progress progress )
+    private void generateNodes( BatchInserter batchInserter, ProgressListener progressListener )
     {
         batchInserter.setNodeProperties( 0, generate( nodeProperties ) ); // reference node properties
         for ( int i = 1 /*reference node already exists*/; i < nodeCount; i++ )
         {
             batchInserter.createNode( generate( nodeProperties ) );
-            progress.set( i );
+            progressListener.set( i );
         }
-        progress.done();
+        progressListener.done();
     }
 
-    private void generateRelationships( BatchInserter batchInserter, Progress progress )
+    private void generateRelationships( BatchInserter batchInserter, ProgressListener progressListener )
     {
         for ( int i = 0; i < nodeCount; i++ )
         {
@@ -210,16 +210,16 @@ public class DataGenerator
                 {
                     batchInserter.createRelationship( i, RANDOM.nextInt( nodeCount ), relationshipSpec,
                                                       generate( relationshipProperties ) );
-                    progress.add( 1 );
+                    progressListener.add( 1 );
                 }
             }
         }
-        progress.done();
+        progressListener.done();
     }
 
-    protected Progress.MultiPartBuilder initProgress()
+    protected ProgressMonitorFactory.MultiPartBuilder initProgress()
     {
-        return (reportProgress ? Progress.textual( System.out ) : Progress.Factory.NONE)
+        return (reportProgress ? ProgressMonitorFactory.textual( System.out ) : ProgressMonitorFactory.NONE)
                 .multipleParts( "Generating " + this );
     }
 

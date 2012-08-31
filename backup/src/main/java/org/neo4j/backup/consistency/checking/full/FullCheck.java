@@ -3,13 +3,16 @@ package org.neo4j.backup.consistency.checking.full;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.neo4j.backup.consistency.report.ConsistencyReport;
 import org.neo4j.backup.consistency.report.ConsistencyReporter;
 import org.neo4j.backup.consistency.store.DirectReferenceDispatcher;
 import org.neo4j.backup.consistency.store.SimpleRecordAccess;
 import org.neo4j.graphdb.factory.GraphDatabaseSetting;
-import org.neo4j.helpers.Progress;
+import org.neo4j.helpers.progress.Completion;
+import org.neo4j.helpers.progress.ProgressMonitorFactory;
+import org.neo4j.helpers.progress.ProgressListener;
 import org.neo4j.kernel.DefaultFileSystemAbstraction;
 import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.DefaultLastCommittedTxIdSetter;
@@ -35,27 +38,28 @@ public class FullCheck
             new GraphDatabaseSetting.BooleanSetting( "consistency_check_property_owners" );
 
     private final boolean checkPropertyOwners;
-    private final Progress.Factory progressFactory;
+    private final ProgressMonitorFactory progressFactory;
 
-    public FullCheck( boolean checkPropertyOwners, Progress.Factory progressFactory )
+    public FullCheck( boolean checkPropertyOwners, ProgressMonitorFactory progressFactory )
     {
         this.checkPropertyOwners = checkPropertyOwners;
         this.progressFactory = progressFactory;
     }
 
-    public void execute( StoreAccess store, StringLogger logger )
+    public void execute( StoreAccess store, StringLogger logger ) throws ConsistencyCheckIncompleteException
     {
         execute( store, ConsistencyReporter.create( new SimpleRecordAccess( store ),
                                                     new DirectReferenceDispatcher(),
                                                     logger ) );
     }
 
-    public void execute( StoreAccess store, ConsistencyReport.Reporter reporter )
+    public void execute( StoreAccess store, ConsistencyReport.Reporter reporter ) throws ConsistencyCheckIncompleteException
+
     {
         StoreProcessor processor = new StoreProcessor( checkPropertyOwners, reporter );
 
-        Progress.MultiPartBuilder progress = progressFactory.multipleParts( "Full consistency check" );
-        List<Runnable> tasks = new ArrayList<Runnable>( 9 );
+        ProgressMonitorFactory.MultiPartBuilder progress = progressFactory.multipleParts( "Full consistency check" );
+        List<StoreProcessorTask> tasks = new ArrayList<StoreProcessorTask>( 9 );
 
         tasks.add( new StoreProcessorTask<NodeRecord>( store.getNodeStore(), processor, progress ) );
         tasks.add( new StoreProcessorTask<RelationshipRecord>( store.getRelationshipStore(), processor, progress ) );
@@ -69,22 +73,34 @@ public class FullCheck
         tasks.add( new StoreProcessorTask<DynamicRecord>( store.getTypeNameStore(), processor, progress ) );
         tasks.add( new StoreProcessorTask<DynamicRecord>( store.getPropertyKeyStore(), processor, progress ) );
 
-        progress.complete();
-
         execute( tasks );
 
+        Completion completion = progress.build();
+
+        try
+        {
+            completion.await( 7, TimeUnit.DAYS );
+        }
+        catch ( Exception e )
+        {
+            processor.stopScanning();
+            throw new ConsistencyCheckIncompleteException( e );
+        }
+
+        // TODO: Make a task for this too
         processor.checkOrphanPropertyChains( progressFactory );
     }
 
-    protected void execute( List<Runnable> tasks )
+    protected void execute( List<? extends Runnable> tasks )
     {
         for ( Runnable task : tasks )
         {
-            task.run();
+            new Thread( task ).start();
         }
     }
 
-    public static void run( Progress.Factory progressFactory, String storeDir, Config config, StringLogger logger )
+    public static void run( ProgressMonitorFactory progressFactory, String storeDir, Config config,
+                            StringLogger logger ) throws ConsistencyCheckIncompleteException
     {
         StoreFactory factory = new StoreFactory( config,
                                                  new DefaultIdGeneratorFactory(),
@@ -108,21 +124,28 @@ public class FullCheck
     {
         private final RecordStore<R> store;
         private final StoreProcessor processor;
-        private final Progress progress;
+        private final ProgressListener progressListener;
 
-        StoreProcessorTask( RecordStore<R> store, StoreProcessor processor, Progress.MultiPartBuilder builder )
+        StoreProcessorTask( RecordStore<R> store, StoreProcessor processor, ProgressMonitorFactory.MultiPartBuilder builder )
         {
             this.store = store;
             this.processor = processor;
             String name = store.getStorageFileName();
-            this.progress = builder.progressForPart( name.substring( name.lastIndexOf( '/' ) + 1 ), store.getHighId() );
+            this.progressListener = builder.progressForPart( name.substring( name.lastIndexOf( '/' ) + 1 ), store.getHighId() );
         }
 
         @Override
         @SuppressWarnings("unchecked")
         public void run()
         {
-            processor.applyFiltered( store, progress );
+            try
+            {
+                processor.applyFiltered( store, progressListener );
+            }
+            catch ( Throwable e )
+            {
+                progressListener.failed( e );
+            }
         }
     }
 }

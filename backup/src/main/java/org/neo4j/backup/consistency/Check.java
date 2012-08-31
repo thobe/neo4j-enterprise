@@ -3,10 +3,11 @@ package org.neo4j.backup.consistency;
 import java.io.File;
 import java.io.IOException;
 
+import org.neo4j.backup.consistency.checking.full.ConsistencyCheckIncompleteException;
 import org.neo4j.backup.consistency.checking.full.FullCheck;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.Args;
-import org.neo4j.helpers.Progress;
+import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.DefaultFileSystemAbstraction;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
 import org.neo4j.kernel.configuration.Config;
@@ -71,11 +72,18 @@ public class Check
                 System.err.printf( "Failure when checking for active logs: '%s', continuing as normal.%n", e );
             }
         }
-        FullCheck.run( Progress.textual( System.err ), storeDir,
-                       new Config( new ConfigurationDefaults( GraphDatabaseSettings.class ).apply(
-                               stringMap( FullCheck.consistency_check_property_owners.name(),
-                                          Boolean.toString( params.getBoolean( "propowner", false, true ) ) ) ) ),
-                       StringLogger.SYSTEM );
+        try
+        {
+            FullCheck.run( ProgressMonitorFactory.textual( System.err ), storeDir,
+                           new Config( new ConfigurationDefaults( GraphDatabaseSettings.class ).apply(
+                                   stringMap( FullCheck.consistency_check_property_owners.name(),
+                                              Boolean.toString( params.getBoolean( "propowner", false, true ) ) ) ) ),
+                           StringLogger.SYSTEM );
+        }
+        catch ( ConsistencyCheckIncompleteException e )
+        {
+            e.printStackTrace( System.err );
+        }
     }
 
     private static void printUsage( String... msgLines )

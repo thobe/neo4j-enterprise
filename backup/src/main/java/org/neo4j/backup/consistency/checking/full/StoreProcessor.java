@@ -9,7 +9,7 @@ import org.neo4j.backup.consistency.checking.RecordCheck;
 import org.neo4j.backup.consistency.checking.RelationshipLabelRecordCheck;
 import org.neo4j.backup.consistency.checking.RelationshipRecordCheck;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.helpers.Progress;
+import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
@@ -43,7 +43,7 @@ class StoreProcessor extends RecordStore.Processor
         this.relationshipLabelChecker = new RelationshipLabelRecordCheck();
     }
 
-    void checkOrphanPropertyChains( Progress.Factory progressFactory )
+    void checkOrphanPropertyChains( ProgressMonitorFactory progressFactory )
     {
         ownerCheck.scanForOrphanChains( report, progressFactory );
     }

@@ -8,7 +8,8 @@ import org.neo4j.backup.consistency.checking.InconsistencyReport;
 import org.neo4j.backup.consistency.repair.RelationshipChainField;
 import org.neo4j.backup.consistency.repair.RelationshipNodeField;
 import org.neo4j.backup.consistency.store.DiffRecordStore;
-import org.neo4j.helpers.Progress;
+import org.neo4j.helpers.progress.ProgressMonitorFactory;
+import org.neo4j.helpers.progress.ProgressListener;
 import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
@@ -74,11 +75,11 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
 
     private final static RelationshipNodeField[] nodeFields = RelationshipNodeField.values();
     private final static RelationshipChainField[] relFields = RelationshipChainField.values();
-    private final Progress.Factory progressFactory;
+    private final ProgressMonitorFactory progressFactory;
 
     public ConsistencyRecordProcessor( StoreAccess stores, InconsistencyReport report)
     {
-        this( stores, false, report, Progress.Factory.NONE );
+        this( stores, false, report, ProgressMonitorFactory.NONE );
     }
 
     /**
@@ -86,7 +87,7 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
      *
      * @param stores the stores to check.
      */
-    public ConsistencyRecordProcessor( StoreAccess stores, InconsistencyReport report, Progress.Factory progressFactory )
+    public ConsistencyRecordProcessor( StoreAccess stores, InconsistencyReport report, ProgressMonitorFactory progressFactory )
     {
         this( stores, false, report, progressFactory );
     }
@@ -101,7 +102,7 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
      * @param checkPropertyOwners if <code>true</code> ownership validation will
      */
     public ConsistencyRecordProcessor( StoreAccess stores, boolean checkPropertyOwners, InconsistencyReport report,
-                                       Progress.Factory progressFactory )
+                                       ProgressMonitorFactory progressFactory )
     {
         this.nodes = stores.getNodeStore();
         this.rels = stores.getRelationshipStore();
@@ -577,7 +578,7 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
     @Override
     public void run()
     {
-        Progress.MultiPartBuilder builder = progressFactory.multipleParts( "ConsistencyCheck" );
+        ProgressMonitorFactory.MultiPartBuilder builder = progressFactory.multipleParts( "ConsistencyCheck" );
 
         List<Runnable> tasks = new ArrayList<Runnable>( 9 );
 
@@ -596,7 +597,7 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
         tasks.add( storeProcessor( propKeys, builder ) );
         tasks.add( storeProcessor( typeNames, builder ) );
 
-        builder.complete();
+        builder.build();
 
         for ( Runnable task : tasks )
         {
@@ -605,7 +606,7 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
     }
 
     private <R extends AbstractBaseRecord> StoreProcessor<R> storeProcessor( RecordStore<R> store,
-                                                                             Progress.MultiPartBuilder builder )
+                                                                             ProgressMonitorFactory.MultiPartBuilder builder )
     {
         return new StoreProcessor<R>( store, builder );
     }
@@ -613,20 +614,20 @@ public class ConsistencyRecordProcessor extends RecordStore.Processor implements
     private class StoreProcessor<R extends AbstractBaseRecord> implements Runnable
     {
         private final RecordStore<R> store;
-        private final Progress progress;
+        private final ProgressListener progressListener;
 
-        private StoreProcessor( RecordStore<R> store, Progress.MultiPartBuilder builder )
+        private StoreProcessor( RecordStore<R> store, ProgressMonitorFactory.MultiPartBuilder builder )
         {
             this.store = store;
             String name = store.getStorageFileName();
-            this.progress = builder.progressForPart( name.substring( name.lastIndexOf( '/' ) + 1 ), store.getHighId() );
+            this.progressListener = builder.progressForPart( name.substring( name.lastIndexOf( '/' ) + 1 ), store.getHighId() );
         }
 
         @Override
         @SuppressWarnings( "unchecked" )
         public void run()
         {
-            applyFiltered( store, progress, RecordStore.IN_USE );
+            applyFiltered( store, progressListener, RecordStore.IN_USE );
         }
     }
 }

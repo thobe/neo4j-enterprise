@@ -29,9 +29,10 @@ import java.util.Map;
 
 import javax.transaction.xa.Xid;
 
+import org.neo4j.backup.consistency.checking.full.ConsistencyCheckIncompleteException;
 import org.neo4j.backup.consistency.checking.full.FullCheck;
 import org.neo4j.helpers.Args;
-import org.neo4j.helpers.Progress;
+import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.helpers.ProgressIndicator;
 import org.neo4j.kernel.InternalAbstractGraphDatabase;
 import org.neo4j.kernel.configuration.Config;
@@ -185,7 +186,7 @@ class RebuildFromLogs
                 graphdb.shutdown();
             }
         }
-        catch ( IOException e )
+        catch ( Exception e )
         {
             System.err.println();
             e.printStackTrace( System.err );
@@ -225,9 +226,9 @@ class RebuildFromLogs
         return txId;
     }
 
-    private void checkConsistency()
+    private void checkConsistency() throws ConsistencyCheckIncompleteException
     {
-        new FullCheck( true, Progress.textual( System.err ) ).execute( stores, StringLogger.SYSTEM );
+        new FullCheck( true, ProgressMonitorFactory.textual( System.err ) ).execute( stores, StringLogger.SYSTEM );
     }
 
     private static void printUsage( String... msgLines )

@@ -135,7 +135,7 @@ public abstract class Setting<T>
             }
 
             @Override
-            String asString( List<T> value )
+            public String asString( List<T> value )
             {
                 StringBuilder result = new StringBuilder();
                 Iterator<T> iterator = value.iterator();
@@ -206,7 +206,7 @@ public abstract class Setting<T>
         parse( value );
     }
 
-    String asString( T value )
+    public String asString( T value )
     {
         return value.toString();
     }

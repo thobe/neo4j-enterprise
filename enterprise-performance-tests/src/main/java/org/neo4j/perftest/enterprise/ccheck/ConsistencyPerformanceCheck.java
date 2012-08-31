@@ -28,7 +28,7 @@ import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.util.DefaultPrettyPrinter;
 import org.neo4j.backup.consistency.checking.full.FullCheck;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
-import org.neo4j.helpers.Progress;
+import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.configuration.ConfigurationDefaults;
@@ -46,7 +46,7 @@ import static org.neo4j.perftest.enterprise.util.Setting.stringSetting;
 
 public class ConsistencyPerformanceCheck
 {
-    private static final Setting<Boolean> generate_graph = booleanSetting( "generate_graph", true );
+    private static final Setting<Boolean> generate_graph = booleanSetting( "generate_graph", false );
     private static final Setting<String> report_file = stringSetting( "report_file", "target/report.json" );
 
     /**
@@ -67,9 +67,8 @@ public class ConsistencyPerformanceCheck
                        .convert( args ) );
     }
 
-    private static void run( Configuration configuration ) throws IOException
+    private static void run( Configuration configuration ) throws Exception
     {
-        File reportFile = new File( configuration.get( report_file ) );
         if ( configuration.get( generate_graph ) )
         {
             File storeDir = new File( configuration.get( DataGenerator.store_dir ) );
@@ -83,16 +82,16 @@ public class ConsistencyPerformanceCheck
         new EmbeddedGraphDatabase( configuration.get( DataGenerator.store_dir ) ).shutdown();
 
         // run the consistency check
-        Progress.Factory progress;
+        ProgressMonitorFactory progress;
         if ( configuration.get( DataGenerator.report_progress ) )
         {
-            progress = Progress.textual( System.out );
+            progress = ProgressMonitorFactory.textual( System.out );
         }
         else
         {
-            progress = Progress.Factory.NONE;
+            progress = ProgressMonitorFactory.NONE;
         }
-        FullCheck.run( new TimingProgress( new JsonReportWriter( reportFile ), progress ),
+        FullCheck.run( new TimingProgress( new JsonReportWriter( configuration ), progress ),
                        configuration.get( DataGenerator.store_dir ),
                        new Config( new ConfigurationDefaults( GraphDatabaseSettings.class ).apply( stringMap() ) ),
                        StringLogger.DEV_NULL );
@@ -103,10 +102,12 @@ public class ConsistencyPerformanceCheck
         private final File target;
         private JsonGenerator json;
         private boolean writeRecordsPerSecond = true;
+        private final Configuration configuration;
 
-        JsonReportWriter( File target )
+        JsonReportWriter( Configuration configuration )
         {
-            this.target = target;
+            this.configuration = configuration;
+            target = new File( configuration.get( report_file ) );
         }
 
         @Override
@@ -118,6 +119,12 @@ public class ConsistencyPerformanceCheck
             json.setPrettyPrinter( new DefaultPrettyPrinter() );
             json.writeStartObject();
             {
+                json.writeFieldName( "config" );
+                json.writeStartObject();
+                emitConfig();
+                json.writeEndObject();
+            }
+            {
                 json.writeFieldName( "total" );
                 json.writeStartObject();
                 emitTime( totalElementCount, totalTimeNanos );
@@ -125,6 +132,19 @@ public class ConsistencyPerformanceCheck
             }
             json.writeFieldName( "phases" );
             json.writeStartArray();
+        }
+
+        private void emitConfig() throws IOException
+        {
+            for ( Setting<?> setting : settingsOf( DataGenerator.class, ConsistencyPerformanceCheck.class ) )
+            {
+                emitSetting( setting );
+            }
+        }
+
+        private <T> void emitSetting( Setting<T> setting ) throws IOException
+        {
+            json.writeStringField( setting.name(), setting.asString( configuration.get( setting ) ) );
         }
 
         @Override

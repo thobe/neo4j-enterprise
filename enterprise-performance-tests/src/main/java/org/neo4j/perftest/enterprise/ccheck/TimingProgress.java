@@ -23,10 +23,10 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.neo4j.helpers.Progress;
-import org.neo4j.helpers.ProgressIndicator;
+import org.neo4j.helpers.progress.ProgressMonitorFactory;
+import org.neo4j.helpers.progress.Indicator;
 
-public class TimingProgress extends Progress.Factory
+public class TimingProgress extends ProgressMonitorFactory
 {
     public interface Visitor
     {
@@ -38,19 +38,19 @@ public class TimingProgress extends Progress.Factory
     }
 
     private final Visitor visitor;
-    private final Progress.Factory actual;
+    private final ProgressMonitorFactory actual;
 
 
-    TimingProgress( Visitor visitor, Progress.Factory actual )
+    TimingProgress( Visitor visitor, ProgressMonitorFactory actual )
     {
         this.visitor = visitor;
         this.actual = actual;
     }
 
     @Override
-    protected Progress.Indicator newIndicator( String process )
+    protected Indicator newIndicator( String process )
     {
-        return new Progress.Indicator.Decorator( actual, process )
+        return new Indicator.Decorator( actual, process )
         {
             private final Timer total = new Timer( null );
             private long totalCount;
