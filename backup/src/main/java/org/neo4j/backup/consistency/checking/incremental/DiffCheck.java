@@ -40,7 +40,7 @@ public abstract class DiffCheck
 
     public final void check( DiffStore diffs ) throws InconsistentStoreException, ConsistencyCheckIncompleteException
     {
-        ConsistencyReporter.SummarisingReporter reporter = ConsistencyReporter
+        ConsistencyReporter reporter = ConsistencyReporter
                 .create( new SimpleRecordAccess( diffs ), new DirectReferenceDispatcher(), logger );
         try
         {

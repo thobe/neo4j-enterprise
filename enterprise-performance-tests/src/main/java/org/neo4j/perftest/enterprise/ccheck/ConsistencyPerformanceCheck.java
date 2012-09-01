@@ -26,12 +26,20 @@ import java.io.IOException;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.util.DefaultPrettyPrinter;
+import org.neo4j.backup.consistency.InconsistencyType;
+import org.neo4j.backup.consistency.checking.ConsistencyReporter;
+import org.neo4j.backup.consistency.checking.MonitoringConsistencyReporter;
+import org.neo4j.backup.consistency.checking.full.ConsistencyCheckIncompleteException;
+import org.neo4j.backup.consistency.checking.full.ConsistencyRecordProcessor;
 import org.neo4j.backup.consistency.checking.full.FullCheck;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.configuration.ConfigurationDefaults;
+import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
+import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.StoreAccess;
 import org.neo4j.kernel.impl.util.FileUtils;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.perftest.enterprise.util.Configuration;
@@ -42,12 +50,61 @@ import static org.neo4j.helpers.collection.MapUtil.stringMap;
 import static org.neo4j.perftest.enterprise.util.Configuration.SYSTEM_PROPERTIES;
 import static org.neo4j.perftest.enterprise.util.Configuration.settingsOf;
 import static org.neo4j.perftest.enterprise.util.Setting.booleanSetting;
+import static org.neo4j.perftest.enterprise.util.Setting.enumSetting;
 import static org.neo4j.perftest.enterprise.util.Setting.stringSetting;
 
 public class ConsistencyPerformanceCheck
 {
     private static final Setting<Boolean> generate_graph = booleanSetting( "generate_graph", false );
     private static final Setting<String> report_file = stringSetting( "report_file", "target/report.json" );
+    private static final Setting<CheckerVersion> checker_version = enumSetting( "checker_version", CheckerVersion.NEW );
+    private static final Setting<Boolean> wait_before_check = booleanSetting( "wait_before_check", false );
+
+    private enum CheckerVersion
+    {
+        OLD
+        {
+            @Override
+            void run( ProgressMonitorFactory progress, String storeDir )
+            {
+                new ConsistencyRecordProcessor(
+                        new StoreAccess( storeDir ),
+                        new MonitoringConsistencyReporter( new ConsistencyReporter()
+                        {
+                            @Override
+                            public <R1 extends AbstractBaseRecord, R2 extends AbstractBaseRecord> void report(
+                                    RecordStore<R1> recordStore,
+                                    R1 record,
+                                    RecordStore<? extends R2> referredStore,
+                                    R2 referred,
+                                    InconsistencyType inconsistency )
+                            {
+                            }
+
+                            @Override
+                            public <R extends AbstractBaseRecord> void report(
+                                    RecordStore<R> recordStore, R record,
+                                    InconsistencyType inconsistency )
+                            {
+                            }
+                        } ), progress ).run();
+            }
+        },
+        NEW
+        {
+            @Override
+            void run( ProgressMonitorFactory progress, String storeDir ) throws ConsistencyCheckIncompleteException
+            {
+                FullCheck.run( progress, storeDir,
+                               new Config( new ConfigurationDefaults( GraphDatabaseSettings.class )
+                                                   .apply( stringMap() ) ),
+                               StringLogger.DEV_NULL );
+            }
+        };
+
+        abstract void run( ProgressMonitorFactory progress, String storeDir )
+                throws ConsistencyCheckIncompleteException;
+    }
 
     /**
      * Sample execution:
@@ -91,10 +148,13 @@ public class ConsistencyPerformanceCheck
         {
             progress = ProgressMonitorFactory.NONE;
         }
-        FullCheck.run( new TimingProgress( new JsonReportWriter( configuration ), progress ),
-                       configuration.get( DataGenerator.store_dir ),
-                       new Config( new ConfigurationDefaults( GraphDatabaseSettings.class ).apply( stringMap() ) ),
-                       StringLogger.DEV_NULL );
+        if ( configuration.get( wait_before_check ) )
+        {
+            System.out.println( "Press return to start the checker..." );
+            System.in.read();
+        }
+        configuration.get( checker_version ).run( new TimingProgress( new JsonReportWriter( configuration ), progress ),
+                                                  configuration.get( DataGenerator.store_dir ) );
     }
 
     private static class JsonReportWriter implements TimingProgress.Visitor

@@ -70,9 +70,9 @@ public class FullCheck
 
     public void execute( StoreAccess store, StringLogger logger ) throws ConsistencyCheckIncompleteException
     {
-        ConsistencyReporter.SummarisingReporter reporter = ConsistencyReporter.create( new SimpleRecordAccess( store ),
-                                                                                       new DirectReferenceDispatcher(),
-                                                                                       logger );
+        ConsistencyReporter reporter = ConsistencyReporter.create( new SimpleRecordAccess( store ),
+                                                                   new DirectReferenceDispatcher(),
+                                                                   logger );
         execute( store, reporter );
         ConsistencySummaryStatistics summary = reporter.getSummary();
         if ( !summary.isConsistent() )
@@ -135,6 +135,7 @@ public class FullCheck
         ExecutorService executor = Executors.newFixedThreadPool( Runtime.getRuntime().availableProcessors() );
         for ( Runnable task : tasks )
         {
+            //task.run();
             executor.submit( task );
         }
         return executor;

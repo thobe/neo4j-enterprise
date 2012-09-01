@@ -29,8 +29,8 @@ import org.neo4j.backup.consistency.store.SimpleRecordAccess;
 import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
-import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.helpers.UTF8;
+import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
@@ -77,7 +77,7 @@ public class FullCheckIntegrationTest
 
     private ConsistencySummaryStatistics check( StoreAccess access ) throws ConsistencyCheckIncompleteException
     {
-        ConsistencyReporter.SummarisingReporter reporter = ConsistencyReporter
+        ConsistencyReporter reporter = ConsistencyReporter
                 .create( new SimpleRecordAccess( access ),
                          new DirectReferenceDispatcher(),
                          StringLogger.DEV_NULL );

@@ -19,13 +19,13 @@
  */
 package org.neo4j.perftest.enterprise.util;
 
-import static java.util.Collections.addAll;
-import static java.util.Collections.emptyList;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+
+import static java.util.Collections.addAll;
+import static java.util.Collections.emptyList;
 
 public abstract class Setting<T>
 {
@@ -105,7 +105,19 @@ public abstract class Setting<T>
     {
         return new Setting<T>( name, null )
         {
+            @Override
+            T parse( String value )
+            {
+                return Enum.valueOf( enumType, value );
+            }
+        };
+    }
 
+    public static <T extends Enum<T>> Setting<T> enumSetting( String name, T defaultValue )
+    {
+        final Class<T> enumType = defaultValue.getDeclaringClass();
+        return new Setting<T>( name, defaultValue )
+        {
             @Override
             T parse( String value )
             {
