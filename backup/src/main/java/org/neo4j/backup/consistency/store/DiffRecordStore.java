@@ -33,6 +33,7 @@ import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
+import org.neo4j.kernel.impl.nioneo.store.WindowPoolStats;
 
 /**
  * Not thread safe, intended for single threaded use.
@@ -93,6 +94,12 @@ public class DiffRecordStore<R extends AbstractBaseRecord> implements RecordStor
     public String getStorageFileName()
     {
         return actual.getStorageFileName();
+    }
+
+    @Override
+    public WindowPoolStats getWindowPoolStats()
+    {
+        return actual.getWindowPoolStats();
     }
 
     @Override

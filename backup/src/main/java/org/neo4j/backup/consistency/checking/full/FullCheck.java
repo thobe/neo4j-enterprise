@@ -88,7 +88,6 @@ public class FullCheck
 
     public void execute( StoreAccess store, ConsistencyReport.Reporter reporter )
             throws ConsistencyCheckIncompleteException
-
     {
         StoreProcessor processor = new StoreProcessor( checkPropertyOwners, reporter );
 
@@ -225,6 +224,7 @@ public class FullCheck
             {
                 progressListener.failed( e );
             }
+            System.out.println( store.getWindowPoolStats() );
         }
     }
 }
