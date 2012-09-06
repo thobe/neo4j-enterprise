@@ -228,7 +228,7 @@ class RebuildFromLogs
 
     private void checkConsistency() throws ConsistencyCheckIncompleteException
     {
-        new FullCheck( true, ProgressMonitorFactory.textual( System.err ) ).execute( stores, StringLogger.SYSTEM );
+        new FullCheck( true, false, ProgressMonitorFactory.textual( System.err ) ).execute( stores, StringLogger.SYSTEM );
     }
 
     private static void printUsage( String... msgLines )

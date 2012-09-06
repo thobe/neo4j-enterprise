@@ -37,6 +37,6 @@ public class FullDiffCheck extends DiffCheck
     public void execute( DiffStore diffs, ConsistencyReport.Reporter reporter )
             throws ConsistencyCheckIncompleteException
     {
-        new FullCheck( false, ProgressMonitorFactory.NONE ).execute( diffs, reporter );
+        new FullCheck( false, false, ProgressMonitorFactory.NONE ).execute( diffs, reporter );
     }
 }

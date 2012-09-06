@@ -59,13 +59,14 @@ public class ConsistencyPerformanceCheck
     private static final Setting<String> report_file = stringSetting( "report_file", "target/report.json" );
     private static final Setting<CheckerVersion> checker_version = enumSetting( "checker_version", CheckerVersion.NEW );
     private static final Setting<Boolean> wait_before_check = booleanSetting( "wait_before_check", false );
+    private static final Setting<Boolean> single_threaded = booleanSetting( "single_threaded", false );
 
     private enum CheckerVersion
     {
         OLD
         {
             @Override
-            void run( ProgressMonitorFactory progress, String storeDir )
+            void run( ProgressMonitorFactory progress, String storeDir, boolean singleThreaded )
             {
                 new ConsistencyRecordProcessor(
                         new StoreAccess( storeDir ),
@@ -93,16 +94,18 @@ public class ConsistencyPerformanceCheck
         NEW
         {
             @Override
-            void run( ProgressMonitorFactory progress, String storeDir ) throws ConsistencyCheckIncompleteException
+            void run( ProgressMonitorFactory progress, String storeDir, boolean singleThreaded ) throws ConsistencyCheckIncompleteException
             {
                 FullCheck.run( progress, storeDir,
                                new Config( new ConfigurationDefaults( GraphDatabaseSettings.class )
-                                                   .apply( stringMap() ) ),
+                                                   .apply( stringMap(
+                                                           FullCheck.consistency_check_single_threaded.name(),
+                                                           Boolean.toString( singleThreaded ) ) ) ),
                                StringLogger.DEV_NULL );
             }
         };
 
-        abstract void run( ProgressMonitorFactory progress, String storeDir )
+        abstract void run( ProgressMonitorFactory progress, String storeDir, boolean singleThreaded )
                 throws ConsistencyCheckIncompleteException;
     }
 
@@ -154,7 +157,8 @@ public class ConsistencyPerformanceCheck
             System.in.read();
         }
         configuration.get( checker_version ).run( new TimingProgress( new JsonReportWriter( configuration ), progress ),
-                                                  configuration.get( DataGenerator.store_dir ) );
+                                                  configuration.get( DataGenerator.store_dir ),
+                                                  configuration.get( single_threaded ) );
     }
 
     private static class JsonReportWriter implements TimingProgress.Visitor

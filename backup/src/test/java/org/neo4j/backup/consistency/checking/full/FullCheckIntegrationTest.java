@@ -81,7 +81,7 @@ public class FullCheckIntegrationTest
                 .create( new SimpleRecordAccess( access ),
                          new DirectReferenceDispatcher(),
                          StringLogger.DEV_NULL );
-        FullCheck checker = new FullCheck( true, ProgressMonitorFactory.NONE );
+        FullCheck checker = new FullCheck( true, true, ProgressMonitorFactory.NONE );
         checker.execute( access, reporter );
         return reporter.getSummary();
     }
