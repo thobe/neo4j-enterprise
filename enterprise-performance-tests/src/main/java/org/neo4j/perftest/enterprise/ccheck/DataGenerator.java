@@ -19,16 +19,29 @@
  */
 package org.neo4j.perftest.enterprise.ccheck;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.TreeMap;
 
 import org.neo4j.graphdb.RelationshipType;
 import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.helpers.progress.ProgressListener;
 import org.neo4j.kernel.impl.batchinsert.BatchInserter;
 import org.neo4j.kernel.impl.batchinsert.BatchInserterImpl;
+import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
+import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
+import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
+import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
+import org.neo4j.kernel.impl.nioneo.store.PropertyType;
+import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.StoreAccess;
+import org.neo4j.kernel.impl.util.FileUtils;
 import org.neo4j.perftest.enterprise.util.Configuration;
 import org.neo4j.perftest.enterprise.util.Conversion;
 import org.neo4j.perftest.enterprise.util.Parameters;
@@ -52,6 +65,14 @@ public class DataGenerator
 
     enum PropertyGenerator
     {
+        INTEGER
+                {
+                    @Override
+                    Object generate()
+                    {
+                        return RANDOM.nextInt( 16 );
+                    }
+                },
         SINGLE_STRING
                 {
                     @Override
@@ -65,7 +86,7 @@ public class DataGenerator
                     @Override
                     Object generate()
                     {
-                        int length = 4 + RANDOM.nextInt( 60 );
+                        int length = 50 + RANDOM.nextInt( 70 );
                         StringBuilder result = new StringBuilder( length );
                         for ( int i = 0; i < length; i++ )
                         {
@@ -79,7 +100,8 @@ public class DataGenerator
                     @Override
                     Object generate()
                     {
-                        int length = 4 + RANDOM.nextInt( 60 );
+//                        int length = 4 + RANDOM.nextInt( 60 );
+                        int length = 50;
                         int[] array = new int[length];
                         for ( int i = 0; i < length; i++ )
                         {
@@ -90,6 +112,49 @@ public class DataGenerator
                 };
 
         abstract Object generate();
+    }
+
+    static class PropertySpec
+    {
+        public static final Conversion<String,PropertySpec> PARSER = new Conversion<String, PropertySpec>()
+        {
+            @Override
+            public PropertySpec convert( String value )
+            {
+                String[] tokens = value.split( ":" );
+                return new PropertySpec( PropertyGenerator.valueOf( tokens[0] ), Float.parseFloat( tokens[1] ) );
+            }
+        };
+
+        private final PropertyGenerator propertyGenerator;
+        private final float count;
+
+        PropertySpec( PropertyGenerator propertyGenerator, float count )
+        {
+            this.propertyGenerator = propertyGenerator;
+            this.count = count;
+        }
+
+        public Map<String, Object> generate()
+        {
+            HashMap<String, Object> map = new HashMap<String, Object>();
+            int propertyCount = (int) count;
+            if (RANDOM.nextFloat() < count - propertyCount)
+            {
+                propertyCount++;
+            }
+            for ( int i = 0; i < propertyCount; i++ )
+            {
+                map.put( propertyGenerator.name() + "_" + i, propertyGenerator.generate() );
+            }
+            return map;
+        }
+
+        @Override
+        public String toString()
+        {
+            return propertyGenerator.name() + ":" + count;
+        }
     }
 
     static class RelationshipSpec implements RelationshipType
@@ -131,25 +196,27 @@ public class DataGenerator
 
     static final Setting<String> store_dir = stringSetting( "neo4j.store_dir", "target/generated-data/graph.db" );
     static final Setting<Boolean> report_progress = booleanSetting( "report_progress", false );
+    static final Setting<Boolean> report_stats = booleanSetting( "report_stats", false );
     static final Setting<Integer> node_count = adaptSetting(
             restrictSetting( integerSetting( "node_count", 100 ), integerRange( 0, Integer.MAX_VALUE ) ),
             Conversion.TO_INTEGER );
     static final Setting<List<RelationshipSpec>> relationships = listSetting(
             adaptSetting( stringSetting( "relationships" ), RelationshipSpec.FROM_STRING ),
             asList(new RelationshipSpec( "RELATED_TO", 2 )) );
-    static final Setting<List<PropertyGenerator>> node_properties = listSetting(
-            enumSetting( PropertyGenerator.class, "node_properties" ),
-            asList( PropertyGenerator.STRING, PropertyGenerator.BYTE_ARRAY ) );
-    static final Setting<List<PropertyGenerator>> relationship_properties = listSetting(
-            enumSetting( PropertyGenerator.class, "relationship_properties" ),
-            asList( PropertyGenerator.STRING ) );
+    static final Setting<List<PropertySpec>> node_properties = listSetting(
+            adaptSetting( Setting.stringSetting( "node_properties" ), PropertySpec.PARSER ),
+            asList( new PropertySpec( PropertyGenerator.STRING, 1 ),
+                    new PropertySpec( PropertyGenerator.BYTE_ARRAY, 1 ) ) );
+    static final Setting<List<PropertySpec>> relationship_properties = listSetting(
+            adaptSetting( Setting.stringSetting( "relationship_properties" ), PropertySpec.PARSER ),
+            Collections.<PropertySpec>emptyList() );
 
     private final boolean reportProgress;
     private final int nodeCount;
     private final int relationshipCount;
     private final List<RelationshipSpec> relationshipsForEachNode;
-    private final List<PropertyGenerator> nodeProperties;
-    private final List<PropertyGenerator> relationshipProperties;
+    private final List<PropertySpec> nodeProperties;
+    private final List<PropertySpec> relationshipProperties;
 
     public DataGenerator( Configuration configuration )
     {
@@ -223,27 +290,27 @@ public class DataGenerator
                 .multipleParts( "Generating " + this );
     }
 
-    private Map<String, Object> generate( List<PropertyGenerator> properties )
+    private Map<String, Object> generate( List<PropertySpec> properties )
     {
         Map<String, Object> result = new HashMap<String, Object>();
-        int id = 0;
-        for ( PropertyGenerator property : properties )
+        for ( PropertySpec property : properties )
         {
-            result.put( property.name() + "_" + (id++), property.generate() );
+            result.putAll( property.generate() );
         }
         return result;
     }
 
-    public static void main( String... args )
+    public static void main( String... args ) throws Exception
     {
         run( Parameters.configuration( SYSTEM_PROPERTIES, settingsOf( DataGenerator.class ) ).convert( args ) );
     }
 
-    static void run( Configuration configuration )
+    static void run( Configuration configuration ) throws IOException
     {
+        String storeDir = configuration.get( store_dir );
+        FileUtils.deleteRecursively( new File( storeDir ) );
         DataGenerator generator = new DataGenerator( configuration );
-        BatchInserter batchInserter = new BatchInserterImpl( configuration.get( store_dir ),
-                                                             generator.batchInserterConfig() );
+        BatchInserter batchInserter = new BatchInserterImpl( storeDir, generator.batchInserterConfig() );
         try
         {
             generator.generateData( batchInserter );
@@ -252,6 +319,32 @@ public class DataGenerator
         {
             batchInserter.shutdown();
         }
+        StoreAccess stores = new StoreAccess( storeDir );
+        try
+        {
+            printCount( stores.getNodeStore() );
+            printCount( stores.getRelationshipStore() );
+            printCount( stores.getPropertyStore() );
+            printCount( stores.getStringStore() );
+            printCount( stores.getArrayStore() );
+            if ( configuration.get( report_stats ) )
+            {
+                PropertyStats stats = new PropertyStats();
+                stats.applyFiltered( stores.getPropertyStore(), RecordStore.IN_USE );
+                System.out.println( stats );
+            }
+        }
+        finally
+        {
+            stores.close();
+        }
+    }
+
+    private static void printCount( RecordStore<?> store )
+    {
+        String name = store.getStorageFileName();
+        name = name.substring( name.lastIndexOf( '/' ) + 1 );
+        System.out.format( "Number of records in %s: %d%n", name, store.getHighId() );
     }
 
     private Map<String, String> batchInserterConfig()
@@ -263,5 +356,45 @@ public class DataGenerator
         config.put( "neostore.relationshipstore.db.mapped_memory", "5000M" );
         config.put( "neostore.propertystore.db.mapped_memory", "2000M" );
         return config;
+    }
+
+    private static class PropertyStats extends RecordStore.Processor
+    {
+        Map<Integer, Long> sizeHistogram = new TreeMap<Integer, Long>();
+        Map<PropertyType, Long> typeHistogram = new EnumMap<PropertyType, Long>( PropertyType.class );
+
+        @Override
+        public void processProperty( RecordStore<PropertyRecord> store, PropertyRecord property )
+        {
+            List<PropertyBlock> blocks = property.getPropertyBlocks();
+            update( sizeHistogram, blocks.size() );
+            for ( PropertyBlock block : blocks )
+            {
+                update( typeHistogram, block.getType() );
+            }
+        }
+
+        private <T> void update( Map<T, Long> histogram, T key )
+        {
+            Long value = histogram.get( key );
+            histogram.put( key, (value == null) ? 1 : (value + 1) );
+        }
+
+        @Override
+        public String toString()
+        {
+            StringBuilder builder = new StringBuilder( getClass().getSimpleName() ).append( "{\n" );
+            for ( Map.Entry<Integer, Long> entry : sizeHistogram.entrySet() )
+            {
+                builder.append( '\t' ).append( entry.getKey() ).append( ": " ).append( entry.getValue() ).append(
+                        '\n' );
+            }
+            for ( Map.Entry<PropertyType, Long> entry : typeHistogram.entrySet() )
+            {
+                builder.append( '\t' ).append( entry.getKey() ).append( ": " ).append( entry.getValue() ).append(
+                        '\n' );
+            }
+            return builder.append( '}' ).toString();
+        }
     }
 }
