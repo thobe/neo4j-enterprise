@@ -29,7 +29,6 @@ import org.neo4j.backup.consistency.checking.RelationshipLabelRecordCheck;
 import org.neo4j.backup.consistency.checking.RelationshipRecordCheck;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
 import org.neo4j.helpers.progress.ProgressMonitorFactory;
-import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
@@ -50,8 +49,8 @@ class StoreProcessor extends AbstractStoreProcessor
 
     private StoreProcessor( PropertyOwnerCheck ownerCheck, ConsistencyReport.Reporter report )
     {
-        super( ownerCheck.decoratePrimitiveChecker( new NodeRecordCheck() ),
-               ownerCheck.decoratePrimitiveChecker( new RelationshipRecordCheck() ),
+        super( ownerCheck.decorateNodeChecker( new NodeRecordCheck() ),
+               ownerCheck.decorateRelationshipChecker( new RelationshipRecordCheck() ),
                ownerCheck.decoratePropertyChecker( new PropertyRecordCheck() ),
                new PropertyKeyRecordCheck(),
                new RelationshipLabelRecordCheck() );
@@ -61,7 +60,7 @@ class StoreProcessor extends AbstractStoreProcessor
 
     void checkOrphanPropertyChains( ProgressMonitorFactory progressFactory )
     {
-        ownerCheck.scanForOrphanChains( report, progressFactory );
+        ownerCheck.scanForOrphanChains( progressFactory );
     }
 
     @Override

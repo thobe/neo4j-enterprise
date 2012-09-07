@@ -19,9 +19,10 @@
  */
 package org.neo4j.backup.consistency.checking.full;
 
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
+import org.neo4j.backup.consistency.checking.ComparativeRecordChecker;
 import org.neo4j.backup.consistency.checking.PrimitiveRecordCheck;
 import org.neo4j.backup.consistency.checking.RecordCheck;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
@@ -33,104 +34,147 @@ import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.Record;
+import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 
 class PropertyOwnerCheck
 {
-    private final Map<Long, PropertyOwner> owners;
+    private final ConcurrentMap<Long, PropertyOwner> owners;
 
     PropertyOwnerCheck( boolean active )
     {
         this.owners = active ? new ConcurrentHashMap<Long, PropertyOwner>( 16, 0.75f, 4 ) : null;
     }
 
-    public <RECORD extends PrimitiveRecord, REPORT extends ConsistencyReport.PrimitiveConsistencyReport<RECORD, REPORT>>
-    RecordCheck<RECORD, REPORT> decoratePrimitiveChecker( final PrimitiveRecordCheck<RECORD, REPORT> checker )
+    void scanForOrphanChains( ProgressMonitorFactory progressFactory )
+    {
+        if ( owners != null )
+        {
+            ProgressListener progress = progressFactory
+                    .singlePart( "Checking for orphan property chains", owners.size() );
+            for ( PropertyOwner owner : owners.values() )
+            {
+                owner.checkOrphanage();
+                progress.add( 1 );
+            }
+            progress.done();
+        }
+    }
+
+    RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> decorateNodeChecker(
+            PrimitiveRecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> checker )
     {
         if ( owners == null )
         {
             return checker;
         }
-        return new RecordCheck<RECORD, REPORT>()
+        return new PrimitiveCheckerDecorator<NodeRecord, ConsistencyReport.NodeConsistencyReport>( checker )
+        {
+            PropertyOwner owner( NodeRecord record )
+            {
+                return new PropertyOwner.OwningNode( record.getId() );
+            }
+        };
+    }
+
+    RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> decorateRelationshipChecker(
+            PrimitiveRecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> checker )
+    {
+        if ( owners == null )
+        {
+            return checker;
+        }
+        return new PrimitiveCheckerDecorator<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport>(
+                checker )
+        {
+            PropertyOwner owner( RelationshipRecord record )
+            {
+                return new PropertyOwner.OwningRelationship( record.getId() );
+            }
+        };
+    }
+
+    RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> decoratePropertyChecker(
+            final RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> checker )
+    {
+        if ( owners == null )
+        {
+            return checker;
+        }
+        return new RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport>()
         {
             @Override
-            public void check( RECORD record, REPORT report, RecordAccess records )
+            public void check( PropertyRecord record, ConsistencyReport.PropertyConsistencyReport report,
+                               RecordAccess records )
             {
-                if ( record.inUse() )
-                {
-                    long prop = record.getNextProp();
-                    if ( !Record.NO_NEXT_PROPERTY.is( prop ) )
+                if ( record.inUse() && Record.NO_PREVIOUS_PROPERTY.is( record.getPrevProp() ) )
+                { // this record is first in a chain
+                    PropertyOwner.UnknownOwner owner = new PropertyOwner.UnknownOwner();
+                    report.forReference( owner, ORPHAN_CHECKER );
+                    if ( null == owners.putIfAbsent( record.getId(), owner ) )
                     {
-                        PropertyOwner previous = owners.put( prop, owner( record ) );
-                        if ( previous != null )
-                        {
-                            report.forReference( previous.record( records ), checker.ownerCheck );
-                        }
+                        owner.skip();
                     }
                 }
                 checker.check( record, report, records );
             }
 
             @Override
-            public void checkChange( RECORD oldRecord, RECORD newRecord, REPORT report, DiffRecordAccess records )
+            public void checkChange( PropertyRecord oldRecord, PropertyRecord newRecord,
+                                     ConsistencyReport.PropertyConsistencyReport report, DiffRecordAccess records )
             {
                 checker.checkChange( oldRecord, newRecord, report, records );
-            }
-
-            private PropertyOwner owner( RECORD record )
-            {
-                if ( record instanceof NodeRecord )
-                {
-                    return new PropertyOwner.OwningNode( record.getId() );
-                }
-                else
-                {
-                    return new PropertyOwner.OwningRelationship( record.getId() );
-                }
             }
         };
     }
 
-    public RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> decoratePropertyChecker(
-            RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> checker )
+    private abstract class PrimitiveCheckerDecorator<RECORD extends PrimitiveRecord,
+            REPORT extends ConsistencyReport.PrimitiveConsistencyReport<RECORD, REPORT>>
+            implements RecordCheck<RECORD, REPORT>
     {
-        if ( owners == null )
-        {
-            return checker;
-        }
-        // TODO: add a decorator that allows us to check for orphan chains
-        return checker;
-    }
+        private final PrimitiveRecordCheck<RECORD, REPORT> checker;
 
-    public void scanForOrphanChains( ConsistencyReport.Reporter report, ProgressMonitorFactory progressFactory )
-    {
-        if ( owners != null )
+        PrimitiveCheckerDecorator( PrimitiveRecordCheck<RECORD, REPORT> checker )
         {
-            ProgressListener progressListener = progressFactory.singlePart( "Checking for orphan property chains", owners.size() );
-            for ( PropertyOwner owner : owners.values() )
+            this.checker = checker;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public void check( RECORD record, REPORT report, RecordAccess records )
+        {
+            if ( record.inUse() )
             {
-                owner.checkOphanage( report, REPORT_ORPHAN );
-                progressListener.add( 1 );
+                long prop = record.getNextProp();
+                if ( !Record.NO_NEXT_PROPERTY.is( prop ) )
+                {
+                    PropertyOwner previous = owners.put( prop, owner( record ) );
+                    if ( previous != null )
+                    {
+                        report.forReference( previous.record( records ), checker.ownerCheck );
+                    }
+                }
             }
-            progressListener.done();
+            checker.check( record, report, records );
         }
+
+        @Override
+        public void checkChange( RECORD oldRecord, RECORD newRecord, REPORT report, DiffRecordAccess records )
+        {
+            checker.checkChange( oldRecord, newRecord, report, records );
+        }
+
+        abstract PropertyOwner owner( RECORD record );
     }
 
-    private static RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> REPORT_ORPHAN =
-            new RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport>()
+    private static final ComparativeRecordChecker
+            <PropertyRecord, PrimitiveRecord, ConsistencyReport.PropertyConsistencyReport> ORPHAN_CHECKER =
+            new ComparativeRecordChecker<PropertyRecord, PrimitiveRecord, ConsistencyReport.PropertyConsistencyReport>()
             {
                 @Override
-                public void check( PropertyRecord record, ConsistencyReport.PropertyConsistencyReport report,
-                                   RecordAccess records )
+                public void checkReference( PropertyRecord record, PrimitiveRecord primitiveRecord,
+                                            ConsistencyReport.PropertyConsistencyReport report )
                 {
                     report.orphanPropertyChain();
-                }
-
-                @Override
-                public void checkChange( PropertyRecord oldRecord, PropertyRecord newRecord,
-                                         ConsistencyReport.PropertyConsistencyReport report,
-                                         DiffRecordAccess records )
-                {
-                    check( newRecord, report, records );
                 }
             };
 }

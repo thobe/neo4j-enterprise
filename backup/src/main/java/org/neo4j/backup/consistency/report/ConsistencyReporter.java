@@ -208,7 +208,7 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
                            ComparativeRecordChecker<?, REFERENCED, ?> checker )
         {
             references++;
-            reference.dispatch( new ReportReference<REFERENCED>( report, checker ) );
+            reference.dispatch( new PendingReferenceCheck<REFERENCED>( report, checker ) );
         }
 
         abstract void emitRecord( StringBuilder message );

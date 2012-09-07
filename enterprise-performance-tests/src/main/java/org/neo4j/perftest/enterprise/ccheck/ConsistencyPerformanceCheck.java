@@ -19,13 +19,6 @@
  */
 package org.neo4j.perftest.enterprise.ccheck;
 
-import static org.neo4j.helpers.collection.MapUtil.stringMap;
-import static org.neo4j.perftest.enterprise.util.Configuration.SYSTEM_PROPERTIES;
-import static org.neo4j.perftest.enterprise.util.Configuration.settingsOf;
-import static org.neo4j.perftest.enterprise.util.Setting.booleanSetting;
-import static org.neo4j.perftest.enterprise.util.Setting.enumSetting;
-import static org.neo4j.perftest.enterprise.util.Setting.stringSetting;
-
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -33,12 +26,12 @@ import java.io.IOException;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.util.DefaultPrettyPrinter;
-import org.neo4j.backup.consistency.InconsistencyType;
-import org.neo4j.backup.consistency.checking.ConsistencyReporter;
-import org.neo4j.backup.consistency.checking.MonitoringConsistencyReporter;
 import org.neo4j.backup.consistency.checking.full.ConsistencyCheckIncompleteException;
-import org.neo4j.backup.consistency.checking.full.ConsistencyRecordProcessor;
 import org.neo4j.backup.consistency.checking.full.FullCheck;
+import org.neo4j.backup.consistency.checking.old.ConsistencyRecordProcessor;
+import org.neo4j.backup.consistency.checking.old.ConsistencyReporter;
+import org.neo4j.backup.consistency.checking.old.InconsistencyType;
+import org.neo4j.backup.consistency.checking.old.MonitoringConsistencyReporter;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
@@ -51,6 +44,13 @@ import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.perftest.enterprise.util.Configuration;
 import org.neo4j.perftest.enterprise.util.Parameters;
 import org.neo4j.perftest.enterprise.util.Setting;
+
+import static org.neo4j.helpers.collection.MapUtil.stringMap;
+import static org.neo4j.perftest.enterprise.util.Configuration.SYSTEM_PROPERTIES;
+import static org.neo4j.perftest.enterprise.util.Configuration.settingsOf;
+import static org.neo4j.perftest.enterprise.util.Setting.booleanSetting;
+import static org.neo4j.perftest.enterprise.util.Setting.enumSetting;
+import static org.neo4j.perftest.enterprise.util.Setting.stringSetting;
 
 public class ConsistencyPerformanceCheck
 {

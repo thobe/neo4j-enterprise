@@ -107,10 +107,10 @@ public class ConsistencyReporterTest
 
             handler.forReference( report, reference, checker );
             @SuppressWarnings("unchecked")
-            ArgumentCaptor<ReportReference<PropertyRecord>> captor =
-                    (ArgumentCaptor) ArgumentCaptor.forClass( ReportReference.class );
+            ArgumentCaptor<PendingReferenceCheck<PropertyRecord>> captor =
+                    (ArgumentCaptor) ArgumentCaptor.forClass( PendingReferenceCheck.class );
             verify( reference ).dispatch( captor.capture() );
-            ReportReference reportRef = captor.getValue();
+            PendingReferenceCheck pendingRefCheck = captor.getValue();
 
             // when
             handler.updateSummary();
@@ -119,7 +119,7 @@ public class ConsistencyReporterTest
             verifyZeroInteractions( summary );
 
             // when
-            reportRef.skip();
+            pendingRefCheck.skip();
 
             // then
             verify( summary ).add( RecordType.PROPERTY, 0, 0 );

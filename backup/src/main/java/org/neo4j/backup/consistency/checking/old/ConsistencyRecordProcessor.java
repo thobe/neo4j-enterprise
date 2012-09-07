@@ -17,18 +17,17 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.backup.consistency.checking.full;
+package org.neo4j.backup.consistency.checking.old;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
-import org.neo4j.backup.consistency.checking.InconsistencyReport;
 import org.neo4j.backup.consistency.repair.RelationshipChainField;
 import org.neo4j.backup.consistency.repair.RelationshipNodeField;
 import org.neo4j.backup.consistency.store.DiffRecordStore;
-import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.helpers.progress.ProgressListener;
+import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
@@ -44,37 +43,37 @@ import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
 import org.neo4j.kernel.impl.nioneo.store.StoreAccess;
 
-import static org.neo4j.backup.consistency.InconsistencyType.PropertyBlockInconsistency.BlockInconsistencyType.DYNAMIC_NOT_IN_USE;
-import static org.neo4j.backup.consistency.InconsistencyType.PropertyBlockInconsistency.BlockInconsistencyType.ILLEGAL_PROPERTY_TYPE;
-import static org.neo4j.backup.consistency.InconsistencyType.PropertyBlockInconsistency.BlockInconsistencyType.INVALID_PROPERTY_KEY;
-import static org.neo4j.backup.consistency.InconsistencyType.PropertyBlockInconsistency.BlockInconsistencyType.UNUSED_PROPERTY_KEY;
-import static org.neo4j.backup.consistency.InconsistencyType.PropertyOwnerInconsistency.OwnerInconsistencyType.MULTIPLE_OWNERS;
-import static org.neo4j.backup.consistency.InconsistencyType.PropertyOwnerInconsistency.OwnerInconsistencyType.PROPERTY_CHANGED_FOR_WRONG_OWNER;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.DYNAMIC_LENGTH_TOO_LARGE;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.INVALID_TYPE_ID;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.NEXT_DYNAMIC_NOT_IN_USE;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.NEXT_DYNAMIC_NOT_REMOVED;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.NEXT_PROPERTY_NOT_IN_USE;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.NON_FULL_DYNAMIC_WITH_NEXT;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.ORPHANED_PROPERTY;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.OVERWRITE_USED_DYNAMIC;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.OWNER_DOES_NOT_REFERENCE_BACK;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.OWNER_NOT_IN_USE;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.PREV_PROPERTY_NOT_IN_USE;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.PROPERTY_CHANGED_WITHOUT_OWNER;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.PROPERTY_FOR_OTHER;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.PROPERTY_NEXT_WRONG_BACKREFERENCE;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.PROPERTY_NOT_IN_USE;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.PROPERTY_PREV_WRONG_BACKREFERENCE;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.RELATIONSHIP_FOR_OTHER_NODE;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.RELATIONSHIP_NOT_IN_USE;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.RELATIONSHIP_NOT_REMOVED_FOR_DELETED_NODE;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.REMOVED_PROPERTY_STILL_REFERENCED;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.REMOVED_RELATIONSHIP_STILL_REFERENCED;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.REPLACED_PROPERTY;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.TYPE_NOT_IN_USE;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.UNUSED_KEY_NAME;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.UNUSED_TYPE_NAME;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.PropertyBlockInconsistency.BlockInconsistencyType.DYNAMIC_NOT_IN_USE;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.PropertyBlockInconsistency.BlockInconsistencyType.ILLEGAL_PROPERTY_TYPE;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.PropertyBlockInconsistency.BlockInconsistencyType.INVALID_PROPERTY_KEY;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.PropertyBlockInconsistency.BlockInconsistencyType.UNUSED_PROPERTY_KEY;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.PropertyOwnerInconsistency.OwnerInconsistencyType.MULTIPLE_OWNERS;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.PropertyOwnerInconsistency.OwnerInconsistencyType.PROPERTY_CHANGED_FOR_WRONG_OWNER;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.DYNAMIC_LENGTH_TOO_LARGE;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.INVALID_TYPE_ID;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.NEXT_DYNAMIC_NOT_IN_USE;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.NEXT_DYNAMIC_NOT_REMOVED;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.NEXT_PROPERTY_NOT_IN_USE;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.NON_FULL_DYNAMIC_WITH_NEXT;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.ORPHANED_PROPERTY;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.OVERWRITE_USED_DYNAMIC;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.OWNER_DOES_NOT_REFERENCE_BACK;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.OWNER_NOT_IN_USE;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.PREV_PROPERTY_NOT_IN_USE;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.PROPERTY_CHANGED_WITHOUT_OWNER;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.PROPERTY_FOR_OTHER;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.PROPERTY_NEXT_WRONG_BACKREFERENCE;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.PROPERTY_NOT_IN_USE;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.PROPERTY_PREV_WRONG_BACKREFERENCE;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.RELATIONSHIP_FOR_OTHER_NODE;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.RELATIONSHIP_NOT_IN_USE;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.RELATIONSHIP_NOT_REMOVED_FOR_DELETED_NODE;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.REMOVED_PROPERTY_STILL_REFERENCED;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.REMOVED_RELATIONSHIP_STILL_REFERENCED;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.REPLACED_PROPERTY;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.TYPE_NOT_IN_USE;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.UNUSED_KEY_NAME;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.UNUSED_TYPE_NAME;
 
 @Deprecated
 public class ConsistencyRecordProcessor extends RecordStore.Processor implements Runnable

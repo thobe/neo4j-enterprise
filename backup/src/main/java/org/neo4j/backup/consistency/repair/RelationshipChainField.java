@@ -19,20 +19,20 @@
  */
 package org.neo4j.backup.consistency.repair;
 
-import org.neo4j.backup.consistency.InconsistencyType;
+import org.neo4j.backup.consistency.checking.old.InconsistencyType;
 import org.neo4j.kernel.impl.nioneo.store.Record;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.SOURCE_NEXT_DIFFERENT_CHAIN;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.SOURCE_NEXT_NOT_IN_USE;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.SOURCE_NO_BACKREF;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.SOURCE_PREV_DIFFERENT_CHAIN;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.SOURCE_PREV_NOT_IN_USE;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.TARGET_NEXT_DIFFERENT_CHAIN;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.TARGET_NEXT_NOT_IN_USE;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.TARGET_NO_BACKREF;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.TARGET_PREV_DIFFERENT_CHAIN;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.TARGET_PREV_NOT_IN_USE;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.SOURCE_NEXT_DIFFERENT_CHAIN;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.SOURCE_NEXT_NOT_IN_USE;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.SOURCE_NO_BACKREF;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.SOURCE_PREV_DIFFERENT_CHAIN;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.SOURCE_PREV_NOT_IN_USE;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.TARGET_NEXT_DIFFERENT_CHAIN;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.TARGET_NEXT_NOT_IN_USE;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.TARGET_NO_BACKREF;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.TARGET_PREV_DIFFERENT_CHAIN;
+import static org.neo4j.backup.consistency.checking.old.InconsistencyType.ReferenceInconsistency.TARGET_PREV_NOT_IN_USE;
 
 @SuppressWarnings( "boxing" )
 public enum RelationshipChainField

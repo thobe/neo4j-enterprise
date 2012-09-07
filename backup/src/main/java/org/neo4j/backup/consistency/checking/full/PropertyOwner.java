@@ -1,149 +1,101 @@
-/**
- * Copyright (c) 2002-2012 "Neo Technology,"
- * Network Engine for Objects in Lund AB [http://neotechnology.com]
- *
- * This file is part of Neo4j.
- *
- * Neo4j is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
- */
 package org.neo4j.backup.consistency.checking.full;
 
-import org.neo4j.backup.consistency.InconsistencyType;
-import org.neo4j.backup.consistency.checking.RecordCheck;
-import org.neo4j.backup.consistency.report.ConsistencyReport;
+import org.neo4j.backup.consistency.report.PendingReferenceCheck;
 import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.backup.consistency.store.RecordReference;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.PROPERTY_NOT_REMOVED_FOR_DELETED_NODE;
-import static org.neo4j.backup.consistency.InconsistencyType.ReferenceInconsistency.PROPERTY_NOT_REMOVED_FOR_DELETED_RELATIONSHIP;
-
-abstract class PropertyOwner
+abstract class PropertyOwner<RECORD extends PrimitiveRecord>
 {
-    final long id;
+    abstract RecordReference<RECORD> record( RecordAccess records );
 
-    PropertyOwner( long id )
+    void checkOrphanage()
     {
-        this.id = id;
+        // default: do nothing
     }
 
-    abstract RecordStore<? extends PrimitiveRecord> storeFrom( RecordStore<NodeRecord> nodes, RecordStore<RelationshipRecord> rels );
-
-    abstract long otherOwnerOf( PropertyRecord prop );
-
-    abstract long ownerOf( PropertyRecord prop );
-
-    abstract InconsistencyType propertyNotRemoved();
-
-    public abstract RecordReference<PrimitiveRecord> record( RecordAccess records );
-
-    abstract void checkOphanage( ConsistencyReport.Reporter report,
-                                 RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> check );
-
-    public static final class OwningNode extends PropertyOwner
+    static class OwningNode extends PropertyOwner<NodeRecord>
     {
+        private final long id;
+
         OwningNode( long id )
         {
-            super( id );
+            this.id = id;
         }
 
         @Override
-        RecordStore<? extends PrimitiveRecord> storeFrom( RecordStore<NodeRecord> nodes, RecordStore<RelationshipRecord> rels )
+        RecordReference<NodeRecord> record( RecordAccess records )
         {
-            return nodes;
-        }
-
-        @Override
-        InconsistencyType propertyNotRemoved()
-        {
-            return PROPERTY_NOT_REMOVED_FOR_DELETED_NODE;
-        }
-
-        @Override
-        @SuppressWarnings( "unchecked" )
-        public RecordReference<PrimitiveRecord> record( RecordAccess records )
-        {
-            return (RecordReference)records.node( id );
-        }
-
-        @Override
-        void checkOphanage( ConsistencyReport.Reporter report,
-                            RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> check )
-        {
-            // not an orphan - do nothing
-        }
-
-        @Override
-        long otherOwnerOf( PropertyRecord prop )
-        {
-            return prop.getRelId();
-        }
-
-        @Override
-        long ownerOf( PropertyRecord prop )
-        {
-            return prop.getNodeId();
+            return records.node( id );
         }
     }
 
-    public static final class OwningRelationship extends PropertyOwner
+    static class OwningRelationship extends PropertyOwner<RelationshipRecord>
     {
+        private final long id;
+
         OwningRelationship( long id )
         {
-            super( id );
+            this.id = id;
         }
 
         @Override
-        RecordStore<? extends PrimitiveRecord> storeFrom( RecordStore<NodeRecord> nodes, RecordStore<RelationshipRecord> rels )
+        RecordReference<RelationshipRecord> record( RecordAccess records )
         {
-            return rels;
-        }
-
-        @Override
-        InconsistencyType propertyNotRemoved()
-        {
-            return PROPERTY_NOT_REMOVED_FOR_DELETED_RELATIONSHIP;
-        }
-
-        @Override
-        @SuppressWarnings( "unchecked" )
-        public RecordReference<PrimitiveRecord> record( RecordAccess records )
-        {
-            return (RecordReference)records.relationship( id );
-        }
-
-        @Override
-        void checkOphanage( ConsistencyReport.Reporter report,
-                            RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> check )
-        {
-            // not an orphan - do nothing
-        }
-
-        @Override
-        long otherOwnerOf( PropertyRecord prop )
-        {
-            return prop.getNodeId();
-        }
-
-        @Override
-        long ownerOf( PropertyRecord prop )
-        {
-            return prop.getRelId();
+            return records.relationship( id );
         }
     }
+
+    static class UnknownOwner extends PropertyOwner<PrimitiveRecord> implements RecordReference<PrimitiveRecord>
+    {
+        private PendingReferenceCheck<PrimitiveRecord> reporter;
+
+        @Override
+        RecordReference<PrimitiveRecord> record( RecordAccess records )
+        {
+            this.skip();
+            return SKIP;
+        }
+
+        @Override
+        void checkOrphanage()
+        {
+            PendingReferenceCheck<PrimitiveRecord> reporter;
+            synchronized ( this )
+            {
+                reporter = this.reporter;
+                this.reporter = null;
+            }
+            if ( reporter != null )
+            {
+                reporter.checkReference( null );
+            }
+        }
+
+        synchronized void skip()
+        {
+            if ( reporter != null )
+            {
+                reporter.skip();
+                reporter = null;
+            }
+        }
+
+        @Override
+        public synchronized void dispatch( PendingReferenceCheck<PrimitiveRecord> reporter )
+        {
+            this.reporter = reporter;
+        }
+    }
+
+    private static final RecordReference<PrimitiveRecord> SKIP = new RecordReference<PrimitiveRecord>()
+    {
+        @Override
+        public void dispatch( PendingReferenceCheck<PrimitiveRecord> reporter )
+        {
+            reporter.skip();
+        }
+    };
 }

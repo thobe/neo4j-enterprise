@@ -28,7 +28,7 @@ import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.neo4j.backup.consistency.checking.ComparativeRecordChecker;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.backup.consistency.report.ReportReference;
+import org.neo4j.backup.consistency.report.PendingReferenceCheck;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
@@ -101,7 +101,7 @@ public class RecordAccessStub implements RecordAccess, DiffRecordAccess
                 @SuppressWarnings("unchecked")
                 public void run()
                 {
-                    ReportReference mock = mock( ReportReference.class );
+                    PendingReferenceCheck mock = mock( PendingReferenceCheck.class );
                     DeferredReferenceCheck check = new DeferredReferenceCheck( DeferredReferenceDispatch.this,
                                                                                checker );
                     doAnswer( check ).when( mock ).checkReference( any( AbstractBaseRecord.class ) );

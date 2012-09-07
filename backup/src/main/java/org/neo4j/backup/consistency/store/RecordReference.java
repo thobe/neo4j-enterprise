@@ -19,10 +19,10 @@
  */
 package org.neo4j.backup.consistency.store;
 
-import org.neo4j.backup.consistency.report.ReportReference;
+import org.neo4j.backup.consistency.report.PendingReferenceCheck;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 
 public interface RecordReference<RECORD extends AbstractBaseRecord>
 {
-    void dispatch( ReportReference<RECORD> reporter );
+    void dispatch( PendingReferenceCheck<RECORD> reporter );
 }
