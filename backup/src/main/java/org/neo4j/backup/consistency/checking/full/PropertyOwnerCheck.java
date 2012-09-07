@@ -25,10 +25,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.neo4j.backup.consistency.checking.PrimitiveRecordCheck;
 import org.neo4j.backup.consistency.checking.RecordCheck;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.backup.consistency.store.DiffRecordReferencer;
-import org.neo4j.backup.consistency.store.RecordReferencer;
-import org.neo4j.helpers.progress.ProgressMonitorFactory;
+import org.neo4j.backup.consistency.store.DiffRecordAccess;
+import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.helpers.progress.ProgressListener;
+import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
@@ -53,7 +53,7 @@ class PropertyOwnerCheck
         return new RecordCheck<RECORD, REPORT>()
         {
             @Override
-            public void check( RECORD record, REPORT report, RecordReferencer records )
+            public void check( RECORD record, REPORT report, RecordAccess records )
             {
                 if ( record.inUse() )
                 {
@@ -71,7 +71,7 @@ class PropertyOwnerCheck
             }
 
             @Override
-            public void checkChange( RECORD oldRecord, RECORD newRecord, REPORT report, DiffRecordReferencer records )
+            public void checkChange( RECORD oldRecord, RECORD newRecord, REPORT report, DiffRecordAccess records )
             {
                 checker.checkChange( oldRecord, newRecord, report, records );
             }
@@ -120,7 +120,7 @@ class PropertyOwnerCheck
             {
                 @Override
                 public void check( PropertyRecord record, ConsistencyReport.PropertyConsistencyReport report,
-                                   RecordReferencer records )
+                                   RecordAccess records )
                 {
                     report.orphanPropertyChain();
                 }
@@ -128,7 +128,7 @@ class PropertyOwnerCheck
                 @Override
                 public void checkChange( PropertyRecord oldRecord, PropertyRecord newRecord,
                                          ConsistencyReport.PropertyConsistencyReport report,
-                                         DiffRecordReferencer records )
+                                         DiffRecordAccess records )
                 {
                     check( newRecord, report, records );
                 }

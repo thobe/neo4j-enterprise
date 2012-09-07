@@ -20,8 +20,8 @@
 package org.neo4j.backup.consistency.checking;
 
 import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.backup.consistency.store.DiffRecordReferencer;
-import org.neo4j.backup.consistency.store.RecordReferencer;
+import org.neo4j.backup.consistency.store.DiffRecordAccess;
+import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.Record;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
@@ -141,6 +141,9 @@ enum RelationshipNodeField implements
         }
     };
 
+    @Override
+    public abstract long valueFrom( RelationshipRecord relationship );
+
     public static RelationshipNodeField select( RelationshipRecord relationship, NodeRecord node )
     {
         return select( relationship, node.getId() );
@@ -169,7 +172,7 @@ enum RelationshipNodeField implements
     @Override
     public void checkConsistency( RelationshipRecord relationship,
                                   ConsistencyReport.RelationshipConsistencyReport report,
-                                  RecordReferencer records )
+                                  RecordAccess records )
     {
         if ( valueFrom( relationship ) < 0 )
         {
@@ -188,7 +191,7 @@ enum RelationshipNodeField implements
     }
 
     @Override
-    public boolean referencedRecordChanged( DiffRecordReferencer records, RelationshipRecord record )
+    public boolean referencedRecordChanged( DiffRecordAccess records, RelationshipRecord record )
     {
         return records.changedNode( valueFrom( record ) ) != null;
     }

@@ -20,9 +20,9 @@
 package org.neo4j.backup.consistency.checking;
 
 import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.backup.consistency.store.DiffRecordReferencer;
+import org.neo4j.backup.consistency.store.DiffRecordAccess;
+import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.backup.consistency.store.RecordReference;
-import org.neo4j.backup.consistency.store.RecordReferencer;
 import org.neo4j.kernel.impl.nioneo.store.AbstractNameRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.Record;
@@ -31,13 +31,13 @@ abstract class NameRecordCheck<RECORD extends AbstractNameRecord, REPORT extends
         implements RecordCheck<RECORD, REPORT>, ComparativeRecordChecker<RECORD, DynamicRecord, REPORT>
 {
     @Override
-    public void checkChange( RECORD oldRecord, RECORD newRecord, REPORT report, DiffRecordReferencer records )
+    public void checkChange( RECORD oldRecord, RECORD newRecord, REPORT report, DiffRecordAccess records )
     {
         check( newRecord, report, records );
     }
 
     @Override
-    public void check( RECORD record, REPORT report, RecordReferencer records )
+    public void check( RECORD record, REPORT report, RecordAccess records )
     {
         if ( !record.inUse() )
         {
@@ -65,7 +65,7 @@ abstract class NameRecordCheck<RECORD extends AbstractNameRecord, REPORT extends
         }
     }
 
-    abstract RecordReference<DynamicRecord> name( RecordReferencer records, int id );
+    abstract RecordReference<DynamicRecord> name( RecordAccess records, int id );
 
     abstract void nameNotInUse( REPORT report, DynamicRecord name );
 

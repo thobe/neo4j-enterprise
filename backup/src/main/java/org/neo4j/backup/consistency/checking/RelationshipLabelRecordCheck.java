@@ -20,8 +20,8 @@
 package org.neo4j.backup.consistency.checking;
 
 import org.neo4j.backup.consistency.report.ConsistencyReport;
+import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.backup.consistency.store.RecordReference;
-import org.neo4j.backup.consistency.store.RecordReferencer;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
 
@@ -29,7 +29,7 @@ public class RelationshipLabelRecordCheck
     extends NameRecordCheck<RelationshipTypeRecord,ConsistencyReport.LabelConsistencyReport>
 {
     @Override
-    protected RecordReference<DynamicRecord> name( RecordReferencer records, int id )
+    protected RecordReference<DynamicRecord> name( RecordAccess records, int id )
     {
         return records.relationshipLabelName( id );
     }

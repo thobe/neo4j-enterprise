@@ -24,7 +24,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.junit.runners.Suite;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.kernel.impl.nioneo.store.AbstractDynamicStore;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.RecordStore;
@@ -50,7 +49,6 @@ public abstract class DynamicRecordCheckTest
     public void shouldNotReportAnythingForRecordNotInUse() throws Exception
     {
         // given
-        RecordAccess records = mock( RecordAccess.class );
         DynamicRecord property = notInUse( record( 42 ) );
 
         // when
@@ -64,7 +62,6 @@ public abstract class DynamicRecordCheckTest
     public void shouldNotReportAnythingForRecordThatDoesNotReferenceOtherRecords() throws Exception
     {
         // given
-        RecordAccess records = mock( RecordAccess.class );
         DynamicRecord property = inUse( fill( record( 42 ), blockSize / 2 ) );
 
         // when
@@ -78,7 +75,6 @@ public abstract class DynamicRecordCheckTest
     public void shouldNotReportAnythingForRecordWithConsistentReferences() throws Exception
     {
         // given
-        RecordAccess records = mock( RecordAccess.class );
         DynamicRecord property = inUse( fill( record( 42 ) ) );
         DynamicRecord next = add( inUse( fill( record( 7 ), blockSize / 2 ) ) );
         property.setNextBlock( next.getId() );
@@ -94,7 +90,6 @@ public abstract class DynamicRecordCheckTest
     public void shouldReportNextRecordNotInUse() throws Exception
     {
         // given
-        RecordAccess records = mock( RecordAccess.class );
         DynamicRecord property = inUse( fill( record( 42 ) ) );
         DynamicRecord next = add( notInUse( record( 7 ) ) );
         property.setNextBlock( next.getId() );
@@ -111,7 +106,6 @@ public abstract class DynamicRecordCheckTest
     public void shouldReportSelfReferentialNext() throws Exception
     {
         // given
-        RecordAccess records = mock( RecordAccess.class );
         DynamicRecord property = add( inUse( fill( record( 42 ) ) ) );
         property.setNextBlock( property.getId() );
 
@@ -127,7 +121,6 @@ public abstract class DynamicRecordCheckTest
     public void shouldReportNonFullRecordWithNextReference() throws Exception
     {
         // given
-        RecordAccess records = mock( RecordAccess.class );
         DynamicRecord property = inUse( fill( record( 42 ), blockSize - 1 ) );
         DynamicRecord next = add( inUse( fill( record( 7 ), blockSize / 2 ) ) );
         property.setNextBlock( next.getId() );
@@ -144,7 +137,6 @@ public abstract class DynamicRecordCheckTest
     public void shouldReportInvalidDataLength() throws Exception
     {
         // given
-        RecordAccess records = mock( RecordAccess.class );
         DynamicRecord property = inUse( record( 42 ) );
         property.setLength( -1 );
 
@@ -160,7 +152,6 @@ public abstract class DynamicRecordCheckTest
     public void shouldReportEmptyRecord() throws Exception
     {
         // given
-        RecordAccess records = mock( RecordAccess.class );
         DynamicRecord property = inUse( record( 42 ) );
 
         // when
@@ -175,7 +166,6 @@ public abstract class DynamicRecordCheckTest
     public void shouldReportRecordWithEmptyNext() throws Exception
     {
         // given
-        RecordAccess records = mock( RecordAccess.class );
         DynamicRecord property = inUse( fill( record( 42 ) ) );
         DynamicRecord next = add( inUse( record( 7 ) ) );
         property.setNextBlock( next.getId() );

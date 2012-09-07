@@ -20,8 +20,8 @@
 package org.neo4j.backup.consistency.checking;
 
 import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.backup.consistency.store.DiffRecordReferencer;
-import org.neo4j.backup.consistency.store.RecordReferencer;
+import org.neo4j.backup.consistency.store.DiffRecordAccess;
+import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.kernel.impl.nioneo.store.Record;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
@@ -44,7 +44,7 @@ public class RelationshipRecordCheck
 
         @Override
         public void checkConsistency( RelationshipRecord record, ConsistencyReport.RelationshipConsistencyReport report,
-                                      RecordReferencer records )
+                                      RecordAccess records )
         {
             if ( record.getType() < 0 )
             {
@@ -69,7 +69,7 @@ public class RelationshipRecordCheck
         }
 
         @Override
-        public boolean referencedRecordChanged( DiffRecordReferencer records, RelationshipRecord record )
+        public boolean referencedRecordChanged( DiffRecordAccess records, RelationshipRecord record )
         {
             return false;
         }
@@ -238,7 +238,7 @@ public class RelationshipRecordCheck
 
         @Override
         public void checkConsistency( RelationshipRecord relationship,
-                                      ConsistencyReport.RelationshipConsistencyReport report, RecordReferencer records )
+                                      ConsistencyReport.RelationshipConsistencyReport report, RecordAccess records )
         {
             if ( !isNone( relationship ) )
             {
@@ -253,7 +253,7 @@ public class RelationshipRecordCheck
         }
 
         @Override
-        public boolean referencedRecordChanged( DiffRecordReferencer records, RelationshipRecord record )
+        public boolean referencedRecordChanged( DiffRecordAccess records, RelationshipRecord record )
         {
             return records.changedRelationship( valueFrom( record ) ) != null;
         }

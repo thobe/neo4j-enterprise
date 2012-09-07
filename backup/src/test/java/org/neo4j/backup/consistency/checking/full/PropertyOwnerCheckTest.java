@@ -26,9 +26,9 @@ import org.neo4j.backup.consistency.checking.NodeRecordCheck;
 import org.neo4j.backup.consistency.checking.RecordCheck;
 import org.neo4j.backup.consistency.checking.RelationshipRecordCheck;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.backup.consistency.store.DiffRecordReferencer;
+import org.neo4j.backup.consistency.store.DiffRecordAccess;
 import org.neo4j.backup.consistency.store.RecordAccess;
-import org.neo4j.backup.consistency.store.RecordReferencer;
+import org.neo4j.backup.consistency.store.RecordAccessStub;
 import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
@@ -43,7 +43,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.NONE;
-import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.add;
 import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.check;
 import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.inUse;
 import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.notInUse;
@@ -73,10 +72,10 @@ public class PropertyOwnerCheckTest
         RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker =
                 decorator.decoratePrimitiveChecker( nodeChecker() );
 
-        RecordAccess records = mock( RecordAccess.class );
+        RecordAccessStub records = new RecordAccessStub();
 
-        NodeRecord node1 = add( records, inUse( new NodeRecord( 1, NONE, 7 ) ) );
-        NodeRecord node2 = add( records, inUse( new NodeRecord( 2, NONE, 8 ) ) );
+        NodeRecord node1 = records.add( inUse( new NodeRecord( 1, NONE, 7 ) ) );
+        NodeRecord node2 = records.add( inUse( new NodeRecord( 2, NONE, 8 ) ) );
 
         // when
         ConsistencyReport.NodeConsistencyReport report1 =
@@ -97,10 +96,10 @@ public class PropertyOwnerCheckTest
         RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker =
                 decorator.decoratePrimitiveChecker( nodeChecker() );
 
-        RecordAccess records = mock( RecordAccess.class );
+        RecordAccessStub records = new RecordAccessStub();
 
-        NodeRecord node1 = add( records, notInUse( new NodeRecord( 1, NONE, 6 ) ) );
-        NodeRecord node2 = add( records, notInUse( new NodeRecord( 2, NONE, 6 ) ) );
+        NodeRecord node1 = records.add( notInUse( new NodeRecord( 1, NONE, 6 ) ) );
+        NodeRecord node2 = records.add( notInUse( new NodeRecord( 2, NONE, 6 ) ) );
 
         // when
         ConsistencyReport.NodeConsistencyReport report1 =
@@ -121,11 +120,11 @@ public class PropertyOwnerCheckTest
         RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> relationshipChecker =
                 decorator.decoratePrimitiveChecker( relationshipChecker() );
 
-        RecordAccess records = mock( RecordAccess.class );
+        RecordAccessStub records = new RecordAccessStub();
 
-        RelationshipRecord relationship1 = add( records, inUse( new RelationshipRecord( 1, 0, 1, 0 ) ) );
+        RelationshipRecord relationship1 = records.add( inUse( new RelationshipRecord( 1, 0, 1, 0 ) ) );
         relationship1.setNextProp( 7 );
-        RelationshipRecord relationship2 = add( records, inUse( new RelationshipRecord( 2, 0, 1, 0 ) ) );
+        RelationshipRecord relationship2 = records.add( inUse( new RelationshipRecord( 2, 0, 1, 0 ) ) );
         relationship2.setNextProp( 8 );
 
         // when
@@ -149,10 +148,10 @@ public class PropertyOwnerCheckTest
         RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker =
                 decorator.decoratePrimitiveChecker( nodeChecker() );
 
-        RecordAccess records = mock( RecordAccess.class );
+        RecordAccessStub records = new RecordAccessStub();
 
-        NodeRecord node1 = add( records, inUse( new NodeRecord( 1, NONE, 7 ) ) );
-        NodeRecord node2 = add( records, inUse( new NodeRecord( 2, NONE, 7 ) ) );
+        NodeRecord node1 = records.add( inUse( new NodeRecord( 1, NONE, 7 ) ) );
+        NodeRecord node2 = records.add( inUse( new NodeRecord( 2, NONE, 7 ) ) );
 
         // when
         ConsistencyReport.NodeConsistencyReport report1 =
@@ -173,11 +172,11 @@ public class PropertyOwnerCheckTest
         RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> relationshipChecker =
                 decorator.decoratePrimitiveChecker( relationshipChecker() );
 
-        RecordAccess records = mock( RecordAccess.class );
+        RecordAccessStub records = new RecordAccessStub();
 
-        RelationshipRecord relationship1 = add( records, inUse( new RelationshipRecord( 1, 0, 1, 0 ) ) );
+        RelationshipRecord relationship1 = records.add( inUse( new RelationshipRecord( 1, 0, 1, 0 ) ) );
         relationship1.setNextProp( 7 );
-        RelationshipRecord relationship2 = add( records, inUse( new RelationshipRecord( 2, 0, 1, 0 ) ) );
+        RelationshipRecord relationship2 = records.add( inUse( new RelationshipRecord( 2, 0, 1, 0 ) ) );
         relationship2.setNextProp( relationship1.getNextProp() );
 
         // when
@@ -203,10 +202,10 @@ public class PropertyOwnerCheckTest
         RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> relationshipChecker =
                 decorator.decoratePrimitiveChecker( relationshipChecker() );
 
-        RecordAccess records = mock( RecordAccess.class );
+        RecordAccessStub records = new RecordAccessStub();
 
-        NodeRecord node = add( records, inUse( new NodeRecord( 1, NONE, 7 ) ) );
-        RelationshipRecord relationship = add( records, inUse( new RelationshipRecord( 1, 0, 1, 0 ) ) );
+        NodeRecord node = records.add( inUse( new NodeRecord( 1, NONE, 7 ) ) );
+        RelationshipRecord relationship = records.add( inUse( new RelationshipRecord( 1, 0, 1, 0 ) ) );
         relationship.setNextProp( node.getNextProp() );
 
         // when
@@ -231,10 +230,10 @@ public class PropertyOwnerCheckTest
         RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> relationshipChecker =
                 decorator.decoratePrimitiveChecker( relationshipChecker() );
 
-        RecordAccess records = mock( RecordAccess.class );
+        RecordAccessStub records = new RecordAccessStub();
 
-        NodeRecord node = add( records, inUse( new NodeRecord( 1, NONE, 7 ) ) );
-        RelationshipRecord relationship = add( records, inUse( new RelationshipRecord( 1, 0, 1, 0 ) ) );
+        NodeRecord node = records.add( inUse( new NodeRecord( 1, NONE, 7 ) ) );
+        RelationshipRecord relationship = records.add( inUse( new RelationshipRecord( 1, 0, 1, 0 ) ) );
         relationship.setNextProp( node.getNextProp() );
 
         // when
@@ -260,7 +259,7 @@ public class PropertyOwnerCheckTest
 
         PropertyRecord record = inUse( new PropertyRecord( 42 ) );
         ConsistencyReport.PropertyConsistencyReport originalReport = check(
-                ConsistencyReport.PropertyConsistencyReport.class, checker, record, mock( RecordAccess.class ) );
+                ConsistencyReport.PropertyConsistencyReport.class, checker, record, new RecordAccessStub() );
         ConsistencyReport.PropertyConsistencyReport report = mock( ConsistencyReport.PropertyConsistencyReport.class );
 
         // when
@@ -278,13 +277,13 @@ public class PropertyOwnerCheckTest
         {
             @Override
             public void check( NodeRecord record, ConsistencyReport.NodeConsistencyReport report,
-                               RecordReferencer records )
+                               RecordAccess records )
             {
             }
 
             @Override
             public void checkChange( NodeRecord oldRecord, NodeRecord newRecord,
-                                     ConsistencyReport.NodeConsistencyReport report, DiffRecordReferencer records )
+                                     ConsistencyReport.NodeConsistencyReport report, DiffRecordAccess records )
             {
             }
         };
@@ -296,14 +295,14 @@ public class PropertyOwnerCheckTest
         {
             @Override
             public void check( RelationshipRecord record, ConsistencyReport.RelationshipConsistencyReport report,
-                               RecordReferencer records )
+                               RecordAccess records )
             {
             }
 
             @Override
             public void checkChange( RelationshipRecord oldRecord, RelationshipRecord newRecord,
                                      ConsistencyReport.RelationshipConsistencyReport report,
-                                     DiffRecordReferencer records )
+                                     DiffRecordAccess records )
             {
             }
         };
@@ -315,13 +314,13 @@ public class PropertyOwnerCheckTest
         {
             @Override
             public void check( PropertyRecord record, ConsistencyReport.PropertyConsistencyReport report,
-                               RecordReferencer records )
+                               RecordAccess records )
             {
             }
 
             @Override
             public void checkChange( PropertyRecord oldRecord, PropertyRecord newRecord,
-                                     ConsistencyReport.PropertyConsistencyReport report, DiffRecordReferencer records )
+                                     ConsistencyReport.PropertyConsistencyReport report, DiffRecordAccess records )
             {
             }
         };
@@ -368,7 +367,7 @@ public class PropertyOwnerCheckTest
         public void forProperty( PropertyRecord property,
                                  RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> checker )
         {
-            checker.check( property, report, mock( RecordReferencer.class ) );
+            checker.check( property, report, mock( RecordAccess.class ) );
         }
 
         @Override

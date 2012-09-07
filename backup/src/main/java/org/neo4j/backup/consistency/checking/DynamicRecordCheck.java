@@ -20,9 +20,9 @@
 package org.neo4j.backup.consistency.checking;
 
 import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.backup.consistency.store.DiffRecordReferencer;
+import org.neo4j.backup.consistency.store.DiffRecordAccess;
+import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.backup.consistency.store.RecordReference;
-import org.neo4j.backup.consistency.store.RecordReferencer;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.Record;
 import org.neo4j.kernel.impl.nioneo.store.RecordStore;
@@ -36,7 +36,7 @@ public class DynamicRecordCheck
         STRING
         {
             @Override
-            RecordReference<DynamicRecord> lookup( RecordReferencer records, long block )
+            RecordReference<DynamicRecord> lookup( RecordAccess records, long block )
             {
                 return records.string( block );
             }
@@ -44,7 +44,7 @@ public class DynamicRecordCheck
         ARRAY
         {
             @Override
-            RecordReference<DynamicRecord> lookup( RecordReferencer records, long block )
+            RecordReference<DynamicRecord> lookup( RecordAccess records, long block )
             {
                 return records.array( block );
             }
@@ -52,7 +52,7 @@ public class DynamicRecordCheck
         PROPERTY_KEY
         {
             @Override
-            RecordReference<DynamicRecord> lookup( RecordReferencer records, long block )
+            RecordReference<DynamicRecord> lookup( RecordAccess records, long block )
             {
                 return records.propertyKeyName( (int) block );
             }
@@ -60,12 +60,12 @@ public class DynamicRecordCheck
         RELATIONSHIP_LABEL
         {
             @Override
-            RecordReference<DynamicRecord> lookup( RecordReferencer records, long block )
+            RecordReference<DynamicRecord> lookup( RecordAccess records, long block )
             {
                 return records.relationshipLabelName( (int) block );
             }
         };
-        abstract RecordReference<DynamicRecord> lookup(RecordReferencer records, long block);
+        abstract RecordReference<DynamicRecord> lookup(RecordAccess records, long block);
     }
 
     private final int blockSize;
@@ -79,13 +79,13 @@ public class DynamicRecordCheck
 
     @Override
     public void checkChange( DynamicRecord oldRecord, DynamicRecord newRecord,
-                             ConsistencyReport.DynamicConsistencyReport report, DiffRecordReferencer records )
+                             ConsistencyReport.DynamicConsistencyReport report, DiffRecordAccess records )
     {
         check( newRecord, report, records );
     }
 
     @Override
-    public void check( DynamicRecord record, ConsistencyReport.DynamicConsistencyReport report, RecordReferencer records )
+    public void check( DynamicRecord record, ConsistencyReport.DynamicConsistencyReport report, RecordAccess records )
     {
         if ( !record.inUse() )
         {

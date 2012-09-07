@@ -79,6 +79,12 @@ public class DiffRecordStore<R extends AbstractBaseRecord> implements RecordStor
     }
 
     @Override
+    public R forceGetRaw( long id )
+    {
+        return actual.forceGetRecord( id );
+    }
+
+    @Override
     public int getRecordHeaderSize()
     {
         return actual.getRecordHeaderSize();

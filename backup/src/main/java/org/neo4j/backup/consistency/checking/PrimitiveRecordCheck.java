@@ -22,8 +22,8 @@ package org.neo4j.backup.consistency.checking;
 import java.util.Arrays;
 
 import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.backup.consistency.store.DiffRecordReferencer;
-import org.neo4j.backup.consistency.store.RecordReferencer;
+import org.neo4j.backup.consistency.store.DiffRecordAccess;
+import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
@@ -62,7 +62,7 @@ public abstract class PrimitiveRecordCheck
             implements RecordField<RECORD, REPORT>, ComparativeRecordChecker<RECORD, PropertyRecord, REPORT>
     {
         @Override
-        public void checkConsistency( RECORD record, REPORT report, RecordReferencer records )
+        public void checkConsistency( RECORD record, REPORT report, RecordAccess records )
         {
             if ( !Record.NO_NEXT_PROPERTY.is( record.getNextProp() ) )
             {
@@ -83,7 +83,7 @@ public abstract class PrimitiveRecordCheck
         }
 
         @Override
-        public boolean referencedRecordChanged( DiffRecordReferencer records, RECORD record )
+        public boolean referencedRecordChanged( DiffRecordAccess records, RECORD record )
         {
             return records.changedProperty( record.getNextProp() ) != null;
         }
@@ -112,7 +112,7 @@ public abstract class PrimitiveRecordCheck
     }
 
     @Override
-    public void check( RECORD record, REPORT report, RecordReferencer records )
+    public void check( RECORD record, REPORT report, RecordAccess records )
     {
         if ( !record.inUse() )
         {
@@ -125,7 +125,7 @@ public abstract class PrimitiveRecordCheck
     }
 
     @Override
-    public void checkChange( RECORD oldRecord, RECORD newRecord, REPORT report, DiffRecordReferencer records )
+    public void checkChange( RECORD oldRecord, RECORD newRecord, REPORT report, DiffRecordAccess records )
     {
         check( newRecord, report, records );
         if ( oldRecord.inUse() )

@@ -22,8 +22,8 @@ package org.neo4j.backup.consistency.checking.full;
 import org.neo4j.backup.consistency.InconsistencyType;
 import org.neo4j.backup.consistency.checking.RecordCheck;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
+import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.backup.consistency.store.RecordReference;
-import org.neo4j.backup.consistency.store.RecordReferencer;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
@@ -50,7 +50,7 @@ abstract class PropertyOwner
 
     abstract InconsistencyType propertyNotRemoved();
 
-    public abstract RecordReference<PrimitiveRecord> record( RecordReferencer records );
+    public abstract RecordReference<PrimitiveRecord> record( RecordAccess records );
 
     abstract void checkOphanage( ConsistencyReport.Reporter report,
                                  RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> check );
@@ -76,7 +76,7 @@ abstract class PropertyOwner
 
         @Override
         @SuppressWarnings( "unchecked" )
-        public RecordReference<PrimitiveRecord> record( RecordReferencer records )
+        public RecordReference<PrimitiveRecord> record( RecordAccess records )
         {
             return (RecordReference)records.node( id );
         }
@@ -122,7 +122,7 @@ abstract class PropertyOwner
 
         @Override
         @SuppressWarnings( "unchecked" )
-        public RecordReference<PrimitiveRecord> record( RecordReferencer records )
+        public RecordReference<PrimitiveRecord> record( RecordAccess records )
         {
             return (RecordReference)records.relationship( id );
         }

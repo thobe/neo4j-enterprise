@@ -23,8 +23,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.backup.consistency.store.DiffRecordReferencer;
-import org.neo4j.backup.consistency.store.RecordReferencer;
+import org.neo4j.backup.consistency.store.DiffRecordAccess;
+import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
@@ -37,7 +37,7 @@ public class PropertyRecordCheck
 {
     @Override
     public void checkChange( PropertyRecord oldRecord, PropertyRecord newRecord,
-                             ConsistencyReport.PropertyConsistencyReport report, DiffRecordReferencer records )
+                             ConsistencyReport.PropertyConsistencyReport report, DiffRecordAccess records )
     {
         check( newRecord, report, records );
         if ( oldRecord.inUse() )
@@ -106,7 +106,7 @@ public class PropertyRecordCheck
 
     @Override
     public void check( PropertyRecord record, ConsistencyReport.PropertyConsistencyReport report,
-                       RecordReferencer records )
+                       RecordAccess records )
     {
         if ( !record.inUse() )
         {
@@ -123,7 +123,7 @@ public class PropertyRecordCheck
     }
 
     private void checkDataBlock( PropertyBlock block, ConsistencyReport.PropertyConsistencyReport report,
-                                 RecordReferencer records )
+                                 RecordAccess records )
     {
         if ( block.getKeyIndexId() < 0 )
         {
@@ -241,7 +241,7 @@ public class PropertyRecordCheck
 
         @Override
         public void checkConsistency( PropertyRecord record, ConsistencyReport.PropertyConsistencyReport report,
-                                      RecordReferencer records )
+                                      RecordAccess records )
         {
             if ( !NONE.is( valueFrom( record ) ) )
             {
@@ -256,7 +256,7 @@ public class PropertyRecordCheck
         }
 
         @Override
-        public boolean referencedRecordChanged( DiffRecordReferencer records, PropertyRecord record )
+        public boolean referencedRecordChanged( DiffRecordAccess records, PropertyRecord record )
         {
             return records.changedProperty( valueFrom( record ) ) != null;
         }

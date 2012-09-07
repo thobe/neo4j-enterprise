@@ -28,31 +28,21 @@ import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
 
 public interface RecordAccess
 {
-    RelationshipRecord getRelationship( long id );
+    RecordReference<NodeRecord> node( final long id );
 
-    PropertyRecord getProperty( long id );
+    RecordReference<RelationshipRecord> relationship( final long id );
 
-    NodeRecord getNode( long id );
+    RecordReference<PropertyRecord> property( final long id );
 
-    RelationshipTypeRecord getType( int id );
+    RecordReference<RelationshipTypeRecord> relationshipLabel( final int id );
 
-    PropertyIndexRecord getKey( int id );
+    RecordReference<PropertyIndexRecord> propertyKey( final int id );
 
-    DynamicRecord getString( long id );
+    RecordReference<DynamicRecord> string( final long id );
 
-    DynamicRecord getArray( long id );
+    RecordReference<DynamicRecord> array( final long id );
 
-    DynamicRecord getLabelName( int id );
+    RecordReference<DynamicRecord> relationshipLabelName( final int id );
 
-    DynamicRecord getKeyName( int id );
-
-    NodeRecord changedNode( long id );
-
-    RelationshipRecord changedRelationship( long id );
-
-    PropertyRecord changedProperty( long id );
-
-    DynamicRecord changedString( long id );
-
-    DynamicRecord changedArray( long id );
+    RecordReference<DynamicRecord> propertyKeyName( final int id );
 }

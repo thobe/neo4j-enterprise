@@ -29,8 +29,7 @@ import java.util.concurrent.TimeUnit;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
 import org.neo4j.backup.consistency.report.ConsistencyReporter;
 import org.neo4j.backup.consistency.report.ConsistencySummaryStatistics;
-import org.neo4j.backup.consistency.store.DirectReferenceDispatcher;
-import org.neo4j.backup.consistency.store.SimpleRecordAccess;
+import org.neo4j.backup.consistency.store.DirectRecordAccess;
 import org.neo4j.graphdb.factory.GraphDatabaseSetting;
 import org.neo4j.helpers.progress.Completion;
 import org.neo4j.helpers.progress.ProgressListener;
@@ -75,9 +74,8 @@ public class FullCheck
 
     public void execute( StoreAccess store, StringLogger logger ) throws ConsistencyCheckIncompleteException
     {
-        ConsistencyReporter reporter = ConsistencyReporter.create( new SimpleRecordAccess( store ),
-                                                                   new DirectReferenceDispatcher(),
-                                                                   logger );
+        ConsistencyReporter reporter = new ConsistencyReporter( logger,
+                                                                new DirectRecordAccess( store ) );
         execute( store, reporter );
         ConsistencySummaryStatistics summary = reporter.getSummary();
         if ( !summary.isConsistent() )
@@ -224,7 +222,6 @@ public class FullCheck
             {
                 progressListener.failed( e );
             }
-            System.out.println( store.getWindowPoolStats() );
         }
     }
 }

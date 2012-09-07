@@ -20,8 +20,8 @@
 package org.neo4j.backup.consistency.checking;
 
 import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.backup.consistency.store.DiffRecordReferencer;
-import org.neo4j.backup.consistency.store.RecordReferencer;
+import org.neo4j.backup.consistency.store.DiffRecordAccess;
+import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.Record;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
@@ -40,7 +40,7 @@ public class NodeRecordCheck extends PrimitiveRecordCheck<NodeRecord, Consistenc
         {
             @Override
             public void checkConsistency( NodeRecord node, ConsistencyReport.NodeConsistencyReport report,
-                                          RecordReferencer records )
+                                          RecordAccess records )
             {
                 if ( !Record.NO_NEXT_RELATIONSHIP.is( node.getNextRel() ) )
                 {
@@ -98,7 +98,7 @@ public class NodeRecordCheck extends PrimitiveRecordCheck<NodeRecord, Consistenc
             }
 
             @Override
-            public boolean referencedRecordChanged( DiffRecordReferencer records, NodeRecord record )
+            public boolean referencedRecordChanged( DiffRecordAccess records, NodeRecord record )
             {
                 return records.changedRelationship( record.getNextRel() ) != null;
             }

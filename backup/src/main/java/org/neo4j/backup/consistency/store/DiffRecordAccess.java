@@ -25,7 +25,7 @@ import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 
 /**
- * A {@link RecordReferencer} for use with incremental checking. Provides access to
+ * A {@link RecordAccess} for use with incremental checking. Provides access to
  * <p/>
  * {@link #previousNode(long) Node}, {@link #previousRelationship(long) Relationship}, and {@link
  * #previousProperty(long) Property} are the only record types one might need a previous version of when checking
@@ -39,50 +39,21 @@ import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
  * new version while checking another type of record. The methods returning new versions of records return
  * <code>null</code> if the record has not been changed.
  */
-public class DiffRecordReferencer extends RecordReferencer
+public interface DiffRecordAccess extends RecordAccess
 {
-    public DiffRecordReferencer( RecordAccess access )
-    {
-        super( access );
-    }
+    RecordReference<NodeRecord> previousNode( long id );
 
-    public RecordReference<NodeRecord> previousNode( long id )
-    {
-        throw new UnsupportedOperationException( "not implemented" );
-    }
+    RecordReference<RelationshipRecord> previousRelationship( long id );
 
-    public RecordReference<RelationshipRecord> previousRelationship( long id )
-    {
-        throw new UnsupportedOperationException( "not implemented" );
-    }
+    RecordReference<PropertyRecord> previousProperty( long id );
 
-    public RecordReference<PropertyRecord> previousProperty( long id )
-    {
-        throw new UnsupportedOperationException( "not implemented" );
-    }
+    NodeRecord changedNode( long id );
 
-    public NodeRecord changedNode( long id )
-    {
-        return access.changedNode( id );
-    }
+    RelationshipRecord changedRelationship( long id );
 
-    public RelationshipRecord changedRelationship( long id )
-    {
-        return access.changedRelationship( id );
-    }
+    PropertyRecord changedProperty( long id );
 
-    public PropertyRecord changedProperty( long id )
-    {
-        return access.changedProperty( id );
-    }
+    DynamicRecord changedString( long id );
 
-    public DynamicRecord changedString( long id )
-    {
-        return access.changedString( id );
-    }
-
-    public DynamicRecord changedArray( long id )
-    {
-        return access.changedArray( id );
-    }
+    DynamicRecord changedArray( long id );
 }

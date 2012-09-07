@@ -19,13 +19,14 @@
  */
 package org.neo4j.backup.consistency.checking.full;
 
+import java.io.StringWriter;
+
 import org.junit.Rule;
 import org.junit.Test;
 import org.neo4j.backup.consistency.RecordType;
 import org.neo4j.backup.consistency.report.ConsistencyReporter;
 import org.neo4j.backup.consistency.report.ConsistencySummaryStatistics;
-import org.neo4j.backup.consistency.store.DirectReferenceDispatcher;
-import org.neo4j.backup.consistency.store.SimpleRecordAccess;
+import org.neo4j.backup.consistency.store.DirectRecordAccess;
 import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
@@ -69,6 +70,7 @@ public class FullCheckIntegrationTest
             }
         }
     };
+    private final StringWriter log = new StringWriter();
 
     private ConsistencySummaryStatistics check() throws ConsistencyCheckIncompleteException
     {
@@ -77,10 +79,8 @@ public class FullCheckIntegrationTest
 
     private ConsistencySummaryStatistics check( StoreAccess access ) throws ConsistencyCheckIncompleteException
     {
-        ConsistencyReporter reporter = ConsistencyReporter
-                .create( new SimpleRecordAccess( access ),
-                         new DirectReferenceDispatcher(),
-                         StringLogger.DEV_NULL );
+        ConsistencyReporter reporter = new ConsistencyReporter( StringLogger.wrap( log ),
+                                                                new DirectRecordAccess( access ) );
         FullCheck checker = new FullCheck( true, true, ProgressMonitorFactory.NONE );
         checker.execute( access, reporter );
         return reporter.getSummary();
@@ -89,8 +89,8 @@ public class FullCheckIntegrationTest
     private void verifyInconsistency( RecordType recordType, ConsistencySummaryStatistics stats )
     {
         int count = stats.getInconsistencyCountForRecordType( recordType );
-        assertTrue( "Expected inconsistencies for records of type: " + recordType, count > 0 );
-        assertEquals( "Expected only inconsistencies of type: " + recordType,
+        assertTrue( "Expected inconsistencies for records of type " + recordType, count > 0 );
+        assertEquals( "Expected only inconsistencies of type " + recordType + ", got:\n" + log,
                       count, stats.getTotalInconsistencyCount() );
     }
 
