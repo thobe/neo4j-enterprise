@@ -31,6 +31,7 @@ import org.neo4j.backup.consistency.report.ConsistencyReport;
 import org.neo4j.backup.consistency.report.PendingReferenceCheck;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
+import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
@@ -38,6 +39,7 @@ import org.neo4j.kernel.impl.nioneo.store.PropertyType;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
 
+import static java.util.Collections.singletonMap;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -104,9 +106,11 @@ public class RecordAccessStub implements RecordAccess, DiffRecordAccess
                     PendingReferenceCheck mock = mock( PendingReferenceCheck.class );
                     DeferredReferenceCheck check = new DeferredReferenceCheck( DeferredReferenceDispatch.this,
                                                                                checker );
-                    doAnswer( check ).when( mock ).checkReference( any( AbstractBaseRecord.class ) );
+                    doAnswer( check ).when( mock ).checkReference( any( AbstractBaseRecord.class ),
+                                                                   any( RecordAccess.class ) );
                     doAnswer( check ).when( mock ).checkDiffReference( any( AbstractBaseRecord.class ),
-                                                                       any( AbstractBaseRecord.class ) );
+                                                                       any( AbstractBaseRecord.class ),
+                                                                       any( RecordAccess.class ) );
                     reference.dispatch( mock );
                 }
             } );
@@ -120,7 +124,7 @@ public class RecordAccessStub implements RecordAccess, DiffRecordAccess
                 @SuppressWarnings("unchecked")
                 public void run()
                 {
-                    checker.checkReference( newRecord, newReference, report );
+                    checker.checkReference( newRecord, newReference, report, RecordAccessStub.this );
                 }
             } );
         }
@@ -142,7 +146,7 @@ public class RecordAccessStub implements RecordAccess, DiffRecordAccess
         {
             Object[] arguments = invocation.getArguments();
             AbstractBaseRecord oldReference = null, newReference;
-            if ( arguments.length == 2 )
+            if ( arguments.length == 3 )
             {
                 oldReference = (AbstractBaseRecord) arguments[0];
                 newReference = (AbstractBaseRecord) arguments[1];
@@ -175,6 +179,7 @@ public class RecordAccessStub implements RecordAccess, DiffRecordAccess
     private final Map<Long, Delta<PropertyIndexRecord>> keys = new HashMap<Long, Delta<PropertyIndexRecord>>();
     private final Map<Long, Delta<DynamicRecord>> labelNames = new HashMap<Long, Delta<DynamicRecord>>();
     private final Map<Long, Delta<DynamicRecord>> keyNames = new HashMap<Long, Delta<DynamicRecord>>();
+    private Delta<NeoStoreRecord> graph;
 
     private static class Delta<R extends AbstractBaseRecord>
     {
@@ -258,15 +263,15 @@ public class RecordAccessStub implements RecordAccess, DiffRecordAccess
     {
         if ( newRecord instanceof NodeRecord )
         {
-            add( nodes, (NodeRecord) newRecord, (NodeRecord) oldRecord );
+            add( nodes, (NodeRecord) oldRecord, (NodeRecord) newRecord );
         }
         else if ( newRecord instanceof RelationshipRecord )
         {
-            add( relationships, (RelationshipRecord) newRecord, (RelationshipRecord) oldRecord );
+            add( relationships, (RelationshipRecord) oldRecord, (RelationshipRecord) newRecord );
         }
         else if ( newRecord instanceof PropertyRecord )
         {
-            add( properties, (PropertyRecord) newRecord, (PropertyRecord) oldRecord );
+            add( properties, (PropertyRecord) oldRecord, (PropertyRecord) newRecord );
         }
         else if ( newRecord instanceof DynamicRecord )
         {
@@ -291,6 +296,14 @@ public class RecordAccessStub implements RecordAccess, DiffRecordAccess
         else if ( newRecord instanceof PropertyIndexRecord )
         {
             add( keys, (PropertyIndexRecord) oldRecord, (PropertyIndexRecord) newRecord );
+        }
+        else if ( newRecord instanceof NeoStoreRecord )
+        {
+            this.graph = new Delta<NeoStoreRecord>( (NeoStoreRecord) oldRecord, (NeoStoreRecord) newRecord );
+        }
+        else
+        {
+            throw new IllegalArgumentException( "Invalid record type" );
         }
         return newRecord;
     }
@@ -333,6 +346,10 @@ public class RecordAccessStub implements RecordAccess, DiffRecordAccess
         {
             add( keys, (PropertyIndexRecord) record );
         }
+        else if ( record instanceof NeoStoreRecord )
+        {
+            this.graph = new Delta<NeoStoreRecord>( (NeoStoreRecord) record );
+        }
         else
         {
             throw new IllegalArgumentException( "Invalid record type" );
@@ -340,10 +357,10 @@ public class RecordAccessStub implements RecordAccess, DiffRecordAccess
         return record;
     }
 
-    private static <R extends AbstractBaseRecord> DirectRecordReference<R> reference( Map<Long, Delta<R>> records,
-                                                                                      long id, Version version )
+    private <R extends AbstractBaseRecord> DirectRecordReference<R> reference( Map<Long, Delta<R>> records,
+                                                                               long id, Version version )
     {
-        return new DirectRecordReference<R>( record( records, id, version ) );
+        return new DirectRecordReference<R>( record( records, id, version ), this );
     }
 
     private static <R extends AbstractBaseRecord> R record( Map<Long, Delta<R>> records, long id,
@@ -416,6 +433,12 @@ public class RecordAccessStub implements RecordAccess, DiffRecordAccess
     }
 
     @Override
+    public RecordReference<NeoStoreRecord> graph()
+    {
+        return reference( singletonMap( -1L, graph ), -1, Version.LATEST );
+    }
+
+    @Override
     public RecordReference<NodeRecord> previousNode( long id )
     {
         return reference( nodes, id, Version.PREV );
@@ -461,5 +484,11 @@ public class RecordAccessStub implements RecordAccess, DiffRecordAccess
     public DynamicRecord changedArray( long id )
     {
         return record( arrays, id, Version.NEW );
+    }
+
+    @Override
+    public RecordReference<NeoStoreRecord> previousGraph()
+    {
+        return reference( singletonMap( -1L, graph ), -1, Version.PREV );
     }
 }

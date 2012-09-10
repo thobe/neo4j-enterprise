@@ -20,10 +20,9 @@
 package org.neo4j.backup.consistency.checking;
 
 import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.backup.consistency.store.RecordAccess;
-import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
+import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 
-public interface ComparativeRecordChecker<RECORD extends AbstractBaseRecord, REFERRED extends AbstractBaseRecord, REPORT extends ConsistencyReport<RECORD, REPORT>>
+public class NeoStoreCheck extends PrimitiveRecordCheck<NeoStoreRecord, ConsistencyReport.NeoStoreConsistencyReport>
 {
-    void checkReference( RECORD record, REFERRED referred, REPORT report, RecordAccess records );
+    // nothing added over PrimitiveRecordCheck
 }

@@ -75,6 +75,7 @@ public abstract class RecordCheckTestBase<RECORD extends AbstractBaseRecord,
     {
         REPORT report = records.mockReport( reportClass, oldRecord, newRecord );
         checker.checkChange( oldRecord, newRecord, report, records );
+        records.checkDeferred();
         return report;
     }
 
@@ -149,7 +150,7 @@ public abstract class RecordCheckTestBase<RECORD extends AbstractBaseRecord,
     }
 
     @SuppressWarnings("unchecked")
-    static void verifyOnlyReferenceDispatch( ConsistencyReport report )
+    public static void verifyOnlyReferenceDispatch( ConsistencyReport report )
     {
         verify( report, atLeast( 0 ) )
                 .forReference( any( RecordReference.class ), any( ComparativeRecordChecker.class ) );

@@ -31,7 +31,7 @@ public class RelationshipRecordCheck
 {
     public RelationshipRecordCheck()
     {
-        super( Label.FIELD,
+        super( Label.LABEL,
                RelationshipNodeField.SOURCE, RelationshipField.SOURCE_PREV, RelationshipField.SOURCE_NEXT,
                RelationshipNodeField.TARGET, RelationshipField.TARGET_PREV, RelationshipField.TARGET_NEXT );
     }
@@ -40,7 +40,7 @@ public class RelationshipRecordCheck
             RecordField<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport>,
             ComparativeRecordChecker<RelationshipRecord, RelationshipTypeRecord, ConsistencyReport.RelationshipConsistencyReport>
     {
-        FIELD;
+        LABEL;
 
         @Override
         public void checkConsistency( RelationshipRecord record, ConsistencyReport.RelationshipConsistencyReport report,
@@ -63,26 +63,15 @@ public class RelationshipRecordCheck
         }
 
         @Override
-        public boolean isNone( RelationshipRecord record )
+        public void checkChange( RelationshipRecord oldRecord, RelationshipRecord newRecord,
+                                 ConsistencyReport.RelationshipConsistencyReport report, DiffRecordAccess records )
         {
-            return false;
-        }
-
-        @Override
-        public boolean referencedRecordChanged( DiffRecordAccess records, RelationshipRecord record )
-        {
-            return false;
-        }
-
-        @Override
-        public void reportReplacedButNotUpdated( ConsistencyReport.RelationshipConsistencyReport report )
-        {
-            // do nothing
+            // nothing to check
         }
 
         @Override
         public void checkReference( RelationshipRecord record, RelationshipTypeRecord referred,
-                                    ConsistencyReport.RelationshipConsistencyReport report )
+                                    ConsistencyReport.RelationshipConsistencyReport report, RecordAccess records )
         {
             if ( !referred.inUse() )
             {
@@ -123,9 +112,9 @@ public class RelationshipRecordCheck
             }
 
             @Override
-            public void reportReplacedButNotUpdated( ConsistencyReport.RelationshipConsistencyReport report )
+            void notUpdated( ConsistencyReport.RelationshipConsistencyReport report )
             {
-                report.sourcePrevReplacedButNotUpdated();
+                report.sourcePrevNotUpdated();
             }
         },
         SOURCE_NEXT( RelationshipNodeField.SOURCE, Record.NO_NEXT_RELATIONSHIP )
@@ -156,9 +145,9 @@ public class RelationshipRecordCheck
             }
 
             @Override
-            public void reportReplacedButNotUpdated( ConsistencyReport.RelationshipConsistencyReport report )
+            void notUpdated( ConsistencyReport.RelationshipConsistencyReport report )
             {
-                report.sourceNextReplacedButNotUpdated();
+                report.sourceNextNotUpdated();
             }
         },
         TARGET_PREV( RelationshipNodeField.TARGET, Record.NO_PREV_RELATIONSHIP )
@@ -189,9 +178,9 @@ public class RelationshipRecordCheck
             }
 
             @Override
-            public void reportReplacedButNotUpdated( ConsistencyReport.RelationshipConsistencyReport report )
+            void notUpdated( ConsistencyReport.RelationshipConsistencyReport report )
             {
-                report.targetPrevReplacedButNotUpdated();
+                report.targetPrevNotUpdated();
             }
         },
         TARGET_NEXT( RelationshipNodeField.TARGET, Record.NO_NEXT_RELATIONSHIP )
@@ -222,9 +211,9 @@ public class RelationshipRecordCheck
             }
 
             @Override
-            public void reportReplacedButNotUpdated( ConsistencyReport.RelationshipConsistencyReport report )
+            void notUpdated( ConsistencyReport.RelationshipConsistencyReport report )
             {
-                report.targetNextReplacedButNotUpdated();
+                report.targetNextNotUpdated();
             }
         };
         private final RelationshipNodeField NODE;
@@ -240,27 +229,15 @@ public class RelationshipRecordCheck
         public void checkConsistency( RelationshipRecord relationship,
                                       ConsistencyReport.RelationshipConsistencyReport report, RecordAccess records )
         {
-            if ( !isNone( relationship ) )
+            if ( !NONE.is( valueFrom( relationship ) ) )
             {
                 report.forReference( records.relationship( valueFrom( relationship ) ), this );
             }
         }
 
         @Override
-        public boolean isNone( RelationshipRecord record )
-        {
-            return NONE.is( valueFrom( record ) );
-        }
-
-        @Override
-        public boolean referencedRecordChanged( DiffRecordAccess records, RelationshipRecord record )
-        {
-            return records.changedRelationship( valueFrom( record ) ) != null;
-        }
-
-        @Override
         public void checkReference( RelationshipRecord record, RelationshipRecord referred,
-                                    ConsistencyReport.RelationshipConsistencyReport report )
+                                    ConsistencyReport.RelationshipConsistencyReport report, RecordAccess records )
         {
             RelationshipNodeField field = RelationshipNodeField.select( referred, node( record ) );
             if ( field == null )
@@ -275,6 +252,22 @@ public class RelationshipRecordCheck
                 }
             }
         }
+
+        @Override
+        public void checkChange( RelationshipRecord oldRecord, RelationshipRecord newRecord,
+                                 ConsistencyReport.RelationshipConsistencyReport report, DiffRecordAccess records )
+        {
+            if ( !newRecord.inUse() || valueFrom( oldRecord ) != valueFrom( newRecord ) )
+            {
+                if ( !NONE.is( valueFrom( oldRecord ) )
+                     && records.changedRelationship( valueFrom( oldRecord ) ) == null )
+                {
+                    notUpdated( report );
+                }
+            }
+        }
+
+        abstract void notUpdated( ConsistencyReport.RelationshipConsistencyReport report );
 
         abstract long other( RelationshipNodeField field, RelationshipRecord relationship );
 

@@ -45,7 +45,7 @@ public class PendingReferenceCheckTest
     public void shouldAllowSkipAfterCheckReference() throws Exception
     {
         // given
-        referenceCheck.checkReference( new PropertyRecord( 0 ) );
+        referenceCheck.checkReference( new PropertyRecord( 0 ), null );
         // when
         referenceCheck.skip();
     }
@@ -54,7 +54,7 @@ public class PendingReferenceCheckTest
     public void shouldAllowSkipAfterCheckDiffReference() throws Exception
     {
         // given
-        referenceCheck.checkDiffReference( new PropertyRecord( 0 ), new PropertyRecord( 0 ) );
+        referenceCheck.checkDiffReference( new PropertyRecord( 0 ), new PropertyRecord( 0 ), null );
         // when
         referenceCheck.skip();
     }
@@ -68,7 +68,7 @@ public class PendingReferenceCheckTest
         // when
         try
         {
-            referenceCheck.checkReference( new PropertyRecord( 0 ) );
+            referenceCheck.checkReference( new PropertyRecord( 0 ), null );
             fail( "expected exception" );
         }
         // then
@@ -87,7 +87,7 @@ public class PendingReferenceCheckTest
         // when
         try
         {
-            referenceCheck.checkDiffReference( new PropertyRecord( 0 ), new PropertyRecord( 0 ) );
+            referenceCheck.checkDiffReference( new PropertyRecord( 0 ), new PropertyRecord( 0 ), null );
             fail( "expected exception" );
         }
         // then
@@ -101,12 +101,12 @@ public class PendingReferenceCheckTest
     public void shouldNotAllowCheckReferenceAfterCheckReference() throws Exception
     {
         // given
-        referenceCheck.checkReference( new PropertyRecord( 0 ) );
+        referenceCheck.checkReference( new PropertyRecord( 0 ), null );
 
         // when
         try
         {
-            referenceCheck.checkReference( new PropertyRecord( 0 ) );
+            referenceCheck.checkReference( new PropertyRecord( 0 ), null );
             fail( "expected exception" );
         }
         // then
@@ -120,12 +120,12 @@ public class PendingReferenceCheckTest
     public void shouldNotAllowCheckDiffReferenceAfterCheckReference() throws Exception
     {
         // given
-        referenceCheck.checkReference( new PropertyRecord( 0 ) );
+        referenceCheck.checkReference( new PropertyRecord( 0 ), null );
 
         // when
         try
         {
-            referenceCheck.checkDiffReference( new PropertyRecord( 0 ), new PropertyRecord( 0 ) );
+            referenceCheck.checkDiffReference( new PropertyRecord( 0 ), new PropertyRecord( 0 ), null );
             fail( "expected exception" );
         }
         // then
@@ -139,12 +139,12 @@ public class PendingReferenceCheckTest
     public void shouldNotAllowCheckReferenceAfterCheckDiffReference() throws Exception
     {
         // given
-        referenceCheck.checkDiffReference( new PropertyRecord( 0 ), new PropertyRecord( 0 ) );
+        referenceCheck.checkDiffReference( new PropertyRecord( 0 ), new PropertyRecord( 0 ), null );
 
         // when
         try
         {
-            referenceCheck.checkReference( new PropertyRecord( 0 ) );
+            referenceCheck.checkReference( new PropertyRecord( 0 ), null );
             fail( "expected exception" );
         }
         // then
@@ -158,12 +158,12 @@ public class PendingReferenceCheckTest
     public void shouldNotAllowCheckDiffReferenceAfterCheckDiffReference() throws Exception
     {
         // given
-        referenceCheck.checkDiffReference( new PropertyRecord( 0 ), new PropertyRecord( 0 ) );
+        referenceCheck.checkDiffReference( new PropertyRecord( 0 ), new PropertyRecord( 0 ), null );
 
         // when
         try
         {
-            referenceCheck.checkDiffReference( new PropertyRecord( 0 ), new PropertyRecord( 0 ) );
+            referenceCheck.checkDiffReference( new PropertyRecord( 0 ), new PropertyRecord( 0 ), null );
             fail( "expected exception" );
         }
         // then

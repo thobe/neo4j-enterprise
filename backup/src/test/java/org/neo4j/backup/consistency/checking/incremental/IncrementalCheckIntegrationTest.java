@@ -22,6 +22,7 @@ package org.neo4j.backup.consistency.checking.incremental;
 import java.io.IOException;
 import java.util.Map;
 
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.neo4j.backup.consistency.ConsistencyCheckingError;
@@ -33,6 +34,7 @@ import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.UTF8;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.LongerShortString;
+import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
@@ -50,6 +52,25 @@ import static org.neo4j.test.Property.set;
 
 public class IncrementalCheckIntegrationTest
 {
+    @Test
+    @Ignore("Support for checking NeoStore needs to be added")
+    public void shouldReportNeoStoreInconsistencies() throws Exception
+    {
+        verifyInconsistencyReported( RecordType.NEO_STORE, new GraphStoreFixture.Transaction()
+        {
+            @Override
+            protected void transactionData( GraphStoreFixture.TransactionDataBuilder tx,
+                                            GraphStoreFixture.IdGenerator next )
+            {
+                NeoStoreRecord record = new NeoStoreRecord();
+                record.setNextProp( next.property() );
+                tx.update( record );
+                // We get exceptions when only the above happens...
+                tx.create( new NodeRecord( next.node(), -1, -1 ) );
+            }
+        } );
+    }
+
     @Test
     public void shouldReportNodeInconsistency() throws Exception
     {
@@ -90,6 +111,7 @@ public class IncrementalCheckIntegrationTest
             {
                 PropertyRecord property = new PropertyRecord( next.property() );
                 property.setPrevProp( next.property() );
+                property.setNodeId( 1 );
 
                 PropertyBlock block = new PropertyBlock();
                 block.setSingleBlock( (((long) PropertyType.INT.intValue()) << 24) | (666 << 28) );
@@ -123,6 +145,10 @@ public class IncrementalCheckIntegrationTest
                 PropertyRecord property = new PropertyRecord( next.property() );
                 property.addPropertyBlock( block );
 
+                NodeRecord node = new NodeRecord( next.node(), -1, property.getId() );
+                property.setNodeId( node.getId() );
+                tx.create( node );
+
                 tx.create( property );
             }
         } );
@@ -150,6 +176,10 @@ public class IncrementalCheckIntegrationTest
 
                 PropertyRecord property = new PropertyRecord( next.property() );
                 property.addPropertyBlock( block );
+
+                NodeRecord node = new NodeRecord( next.node(), -1, property.getId() );
+                property.setNodeId( node.getId() );
+                tx.create( node );
 
                 tx.create( property );
             }
@@ -248,10 +278,10 @@ public class IncrementalCheckIntegrationTest
         {
             int count = expected.getInconsistencyCountForRecordType( recordType );
             int total = expected.getTotalInconsistencyCount();
-            assertTrue( "Expected failures for " + recordType + ", got " + expected, count > 0 );
-            assertEquals(
-                    "Didn't expect failures for any other type than " + recordType + ", got " + expected.getMessage(),
-                    count, total );
+            String summary = expected.getMessage().replace( "\n", "\n\t" );
+            assertTrue( "Expected failures for " + recordType + ", got " + summary, count > 0 );
+            assertEquals( "Didn't expect failures for any other type than " + recordType + ", got " + summary,
+                          count, total );
         }
     }
 }

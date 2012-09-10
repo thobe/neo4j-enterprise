@@ -29,7 +29,7 @@ import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
 import static org.mockito.Mockito.verify;
 
 public class RelationshipRecordCheckTest extends
-        RecordCheckTestBase<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport, RelationshipRecordCheck>
+                                         RecordCheckTestBase<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport, RelationshipRecordCheck>
 {
     public RelationshipRecordCheckTest()
     {
@@ -605,6 +605,295 @@ public class RelationshipRecordCheckTest extends
     }
 
     @Test
+    public void shouldReportProblemsWithTheNewStateWhenCheckingChanges() throws Exception
+    {
+        // given
+        RelationshipRecord oldRelationship = notInUse( new RelationshipRecord( 42, 0, 0, 0 ) );
+        RelationshipRecord newRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+        NodeRecord source = add( notInUse( new NodeRecord( 1, 0, 0 ) ) );
+        NodeRecord target = add( notInUse( new NodeRecord( 2, 0, 0 ) ) );
+        RelationshipTypeRecord label = add( notInUse( new RelationshipTypeRecord( 0 ) ) );
+
+        // when
+        ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
+
+        // then
+        verify( report ).sourceNodeNotInUse( source );
+        verify( report ).targetNodeNotInUse( target );
+        verify( report ).labelNotInUse( label );
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldNotReportAnythingWhenAddingAnInitialProperty() throws Exception
+    {
+        // given
+        add( inUse( new RelationshipTypeRecord( 0 ) ) );
+
+        RelationshipRecord oldRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+        RelationshipRecord newRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+
+        add( inUse( new NodeRecord( 1, 42, NONE ) ) );
+        add( inUse( new NodeRecord( 2, 42, NONE ) ) );
+
+        newRelationship.setNextProp( addChange( notInUse( new PropertyRecord( 10 ) ),
+                                                inUse( new PropertyRecord( 10 ) ) ).getId() );
+
+        // when
+        ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldNotReportAnythingWhenChangingProperty() throws Exception
+    {
+        // given
+        add( inUse( new RelationshipTypeRecord( 0 ) ) );
+
+        RelationshipRecord oldRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+        RelationshipRecord newRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+
+        add( inUse( new NodeRecord( 1, 42, NONE ) ) );
+        add( inUse( new NodeRecord( 2, 42, NONE ) ) );
+
+        PropertyRecord oldProp = addChange( inUse( new PropertyRecord( 10 ) ),
+                                            inUse( new PropertyRecord( 10 ) ) );
+        PropertyRecord newProp = addChange( notInUse( new PropertyRecord( 11 ) ),
+                                            inUse( new PropertyRecord( 11 ) ) );
+        oldProp.setPrevProp( newProp.getId() );
+        newProp.setNextProp( oldProp.getId() );
+
+        oldRelationship.setNextProp( oldProp.getId() );
+        newRelationship.setNextProp( newProp.getId() );
+
+        // when
+        ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldNotReportAnythingWhenAddingPrevSourceRelationship() throws Exception
+    {
+        // given
+        add( inUse( new RelationshipTypeRecord( 0 ) ) );
+
+        RelationshipRecord oldRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+        RelationshipRecord newRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+
+        addChange( inUse( new NodeRecord( 1, 42, NONE ) ),
+                   inUse( new NodeRecord( 1, 10, NONE ) ) );
+        add( inUse( new NodeRecord( 2, 42, NONE ) ) );
+
+        RelationshipRecord prev = addChange( notInUse( new RelationshipRecord( 10, 0, 0, 0 ) ),
+                                             inUse( new RelationshipRecord( 10, 1, 3, 0 ) ) );
+
+        newRelationship.setFirstPrevRel( prev.getId() );
+        prev.setFirstNextRel( newRelationship.getId() );
+
+        // when
+        ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldNotReportAnythingWhenAddingPrevTargetRelationship() throws Exception
+    {
+        // given
+        add( inUse( new RelationshipTypeRecord( 0 ) ) );
+
+        RelationshipRecord oldRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+        RelationshipRecord newRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+
+        add( inUse( new NodeRecord( 1, 42, NONE ) ) );
+        addChange( inUse( new NodeRecord( 2, 42, NONE ) ),
+                   inUse( new NodeRecord( 2, 10, NONE ) ) );
+
+        RelationshipRecord prev = addChange( notInUse( new RelationshipRecord( 10, 0, 0, 0 ) ),
+                                             inUse( new RelationshipRecord( 10, 3, 2, 0 ) ) );
+
+        newRelationship.setSecondPrevRel( prev.getId() );
+        prev.setSecondNextRel( newRelationship.getId() );
+
+        // when
+        ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldNotReportAnythingWhenAddingNextSourceRelationship() throws Exception
+    {
+        // given
+        add( inUse( new RelationshipTypeRecord( 0 ) ) );
+
+        RelationshipRecord oldRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+        RelationshipRecord newRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+
+        add( inUse( new NodeRecord( 1, 42, NONE ) ) );
+        add( inUse( new NodeRecord( 2, 42, NONE ) ) );
+
+        RelationshipRecord next = addChange( notInUse( new RelationshipRecord( 10, 0, 0, 0 ) ),
+                                             inUse( new RelationshipRecord( 10, 1, 3, 0 ) ) );
+
+        newRelationship.setFirstNextRel( next.getId() );
+        next.setFirstPrevRel( newRelationship.getId() );
+
+        // when
+        ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldNotReportAnythingWhenAddingNextTargetRelationship() throws Exception
+    {
+        // given
+        add( inUse( new RelationshipTypeRecord( 0 ) ) );
+
+        RelationshipRecord oldRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+        RelationshipRecord newRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+
+        add( inUse( new NodeRecord( 1, 42, NONE ) ) );
+        add( inUse( new NodeRecord( 2, 42, NONE ) ) );
+
+        RelationshipRecord next = addChange( notInUse( new RelationshipRecord( 10, 0, 0, 0 ) ),
+                                             inUse( new RelationshipRecord( 10, 3, 2, 0 ) ) );
+
+        newRelationship.setSecondNextRel( next.getId() );
+        next.setSecondPrevRel( newRelationship.getId() );
+
+        // when
+        ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldNotReportAnythingWhenChangingPrevSourceRelationship() throws Exception
+    {
+        // given
+        add( inUse( new RelationshipTypeRecord( 0 ) ) );
+
+        RelationshipRecord oldRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+        RelationshipRecord newRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+
+        add( inUse( new NodeRecord( 1, 42, NONE ) ) );
+        add( inUse( new NodeRecord( 2, 42, NONE ) ) );
+
+        RelationshipRecord oldPrev = inUse( new RelationshipRecord( 10, 1, 3, 0 ) );
+        addChange( oldPrev, inUse( new RelationshipRecord( 10, 1, 3, 0 ) ) );
+        RelationshipRecord newPrev = addChange( notInUse( new RelationshipRecord( 11, 0, 0, 0 ) ),
+                                                inUse( new RelationshipRecord( 11, 1, 3, 0 ) ) );
+        oldRelationship.setFirstPrevRel( oldPrev.getId() );
+        oldPrev.setFirstNextRel( oldRelationship.getId() );
+
+        newRelationship.setFirstPrevRel( newPrev.getId() );
+        newPrev.setFirstNextRel( newRelationship.getId() );
+
+        // when
+        ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldNotReportAnythingWhenChangingNextSourceRelationship() throws Exception
+    {
+        // given
+        add( inUse( new RelationshipTypeRecord( 0 ) ) );
+
+        RelationshipRecord oldRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+        RelationshipRecord newRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+
+        add( inUse( new NodeRecord( 1, 42, NONE ) ) );
+        add( inUse( new NodeRecord( 2, 42, NONE ) ) );
+
+        RelationshipRecord oldNext = inUse( new RelationshipRecord( 10, 1, 3, 0 ) );
+        addChange( oldNext, inUse( new RelationshipRecord( 10, 1, 3, 0 ) ) );
+        RelationshipRecord newNext = addChange( notInUse( new RelationshipRecord( 11, 0, 0, 0 ) ),
+                                                inUse( new RelationshipRecord( 11, 1, 3, 0 ) ) );
+        oldRelationship.setFirstNextRel( oldNext.getId() );
+        oldNext.setFirstPrevRel( oldRelationship.getId() );
+
+        newRelationship.setFirstNextRel( newNext.getId() );
+        newNext.setFirstPrevRel( newRelationship.getId() );
+
+        // when
+        ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldNotReportAnythingWhenChangingPrevTargetRelationship() throws Exception
+    {
+        // given
+        add( inUse( new RelationshipTypeRecord( 0 ) ) );
+
+        RelationshipRecord oldRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+        RelationshipRecord newRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+
+        add( inUse( new NodeRecord( 1, 42, NONE ) ) );
+        add( inUse( new NodeRecord( 2, 42, NONE ) ) );
+
+        RelationshipRecord oldPrev = inUse( new RelationshipRecord( 10, 3, 2, 0 ) );
+        addChange( oldPrev, inUse( new RelationshipRecord( 10, 3, 2, 0 ) ) );
+        RelationshipRecord newPrev = addChange( notInUse( new RelationshipRecord( 11, 0, 0, 0 ) ),
+                                                inUse( new RelationshipRecord( 11, 3, 2, 0 ) ) );
+        oldRelationship.setSecondPrevRel( oldPrev.getId() );
+        oldPrev.setSecondNextRel( oldRelationship.getId() );
+
+        newRelationship.setSecondPrevRel( newPrev.getId() );
+        newPrev.setSecondNextRel( newRelationship.getId() );
+
+        // when
+        ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldNotReportAnythingWhenChangingNextTargetRelationship() throws Exception
+    {
+        // given
+        add( inUse( new RelationshipTypeRecord( 0 ) ) );
+
+        RelationshipRecord oldRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+        RelationshipRecord newRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+
+        add( inUse( new NodeRecord( 1, 42, NONE ) ) );
+        add( inUse( new NodeRecord( 2, 42, NONE ) ) );
+
+        RelationshipRecord oldNext = inUse( new RelationshipRecord( 10, 3, 2, 0 ) );
+        addChange( oldNext, inUse( new RelationshipRecord( 10, 3, 2, 0 ) ) );
+        RelationshipRecord newNext = addChange( notInUse( new RelationshipRecord( 11, 0, 0, 0 ) ),
+                                                inUse( new RelationshipRecord( 11, 3, 2, 0 ) ) );
+        oldRelationship.setSecondNextRel( oldNext.getId() );
+        oldNext.setSecondPrevRel( oldRelationship.getId() );
+
+        newRelationship.setSecondNextRel( newNext.getId() );
+        newNext.setSecondPrevRel( newRelationship.getId() );
+
+        // when
+        ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
     public void shouldReportPropertyChainReplacedButNotUpdated() throws Exception
     {
         // given
@@ -622,7 +911,7 @@ public class RelationshipRecordCheckTest extends
         ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
 
         // then
-        verify( report ).propertyReplacedButNotUpdated();
+        verify( report ).propertyNotUpdated();
         verifyOnlyReferenceDispatch( report );
     }
 
@@ -646,7 +935,7 @@ public class RelationshipRecordCheckTest extends
         ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
 
         // then
-        verify( report ).sourcePrevReplacedButNotUpdated();
+        verify( report ).sourcePrevNotUpdated();
         verifyOnlyReferenceDispatch( report );
     }
 
@@ -670,7 +959,7 @@ public class RelationshipRecordCheckTest extends
         ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
 
         // then
-        verify( report ).sourceNextReplacedButNotUpdated();
+        verify( report ).sourceNextNotUpdated();
         verifyOnlyReferenceDispatch( report );
     }
 
@@ -694,7 +983,7 @@ public class RelationshipRecordCheckTest extends
         ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
 
         // then
-        verify( report ).targetPrevReplacedButNotUpdated();
+        verify( report ).targetPrevNotUpdated();
         verifyOnlyReferenceDispatch( report );
     }
 
@@ -718,7 +1007,93 @@ public class RelationshipRecordCheckTest extends
         ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
 
         // then
-        verify( report ).targetNextReplacedButNotUpdated();
+        verify( report ).targetNextNotUpdated();
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportDeletedButReferencesNotUpdated() throws Exception
+    {
+        // given
+        RelationshipRecord oldRelationship = inUse( new RelationshipRecord( 42, 11, 12, 0 ) );
+        oldRelationship.setFirstPrevRel( add( inUse( new RelationshipRecord( 101, 11, 12, 0 ) ) ).getId() );
+        oldRelationship.setFirstNextRel( add( inUse( new RelationshipRecord( 102, 11, 12, 0 ) ) ).getId() );
+        oldRelationship.setSecondPrevRel( add( inUse( new RelationshipRecord( 103, 11, 12, 0 ) ) ).getId() );
+        oldRelationship.setSecondNextRel( add( inUse( new RelationshipRecord( 104, 11, 12, 0 ) ) ).getId() );
+        oldRelationship.setNextProp( add( inUse( new PropertyRecord( 201 ) ) ).getId() );
+        RelationshipRecord newRelationship = notInUse( new RelationshipRecord( 42, 0, 0, 0 ) );
+
+        // when
+        ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
+
+        // then
+        verify( report ).sourcePrevNotUpdated();
+        verify( report ).sourceNextNotUpdated();
+        verify( report ).targetPrevNotUpdated();
+        verify( report ).targetNextNotUpdated();
+        verify( report ).propertyNotUpdated();
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportSourcePrevAddedButNodeNotUpdated() throws Exception
+    {
+        // given
+        RelationshipRecord oldRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+        RelationshipRecord newRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+        add( inUse( new RelationshipTypeRecord( 0 ) ) );
+        add( inUse( new NodeRecord( 1, 42, NONE ) ) );
+        add( inUse( new NodeRecord( 2, 42, NONE ) ) );
+        RelationshipRecord prev = addChange( notInUse( new RelationshipRecord( 10, 0, 0, 0 ) ),
+                                             inUse( new RelationshipRecord( 10, 1, 3, 0 ) ) );
+        newRelationship.setFirstPrevRel( prev.getId() );
+        prev.setFirstNextRel( newRelationship.getId() );
+
+        // when
+        ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
+
+        // then
+        verify( report ).sourceNodeNotUpdated();
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportTargetPrevAddedButNodeNotUpdated() throws Exception
+    {
+        // given
+        RelationshipRecord oldRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+        RelationshipRecord newRelationship = inUse( new RelationshipRecord( 42, 1, 2, 0 ) );
+        add( inUse( new RelationshipTypeRecord( 0 ) ) );
+        add( inUse( new NodeRecord( 1, 42, NONE ) ) );
+        add( inUse( new NodeRecord( 2, 42, NONE ) ) );
+        RelationshipRecord prev = addChange( notInUse( new RelationshipRecord( 10, 0, 0, 0 ) ),
+                                             inUse( new RelationshipRecord( 10, 3, 2, 0 ) ) );
+        newRelationship.setSecondPrevRel( prev.getId() );
+        prev.setSecondNextRel( newRelationship.getId() );
+
+        // when
+        ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
+
+        // then
+        verify( report ).targetNodeNotUpdated();
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportDeletedFirstButReferencedNodesNotUpdated() throws Exception
+    {
+        // given
+        RelationshipRecord oldRelationship = inUse( new RelationshipRecord( 42, 11, 12, 0 ) );
+        RelationshipRecord newRelationship = notInUse( new RelationshipRecord( 42, 0, 0, 0 ) );
+        add( inUse( new NodeRecord( 11, 42, NONE ) ) );
+        add( inUse( new NodeRecord( 12, 42, NONE ) ) );
+
+        // when
+        ConsistencyReport.RelationshipConsistencyReport report = checkChange( oldRelationship, newRelationship );
+
+        // then
+        verify( report ).sourceNodeNotUpdated();
+        verify( report ).targetNodeNotUpdated();
         verifyOnlyReferenceDispatch( report );
     }
 }

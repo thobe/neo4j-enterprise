@@ -31,6 +31,7 @@ import org.neo4j.backup.consistency.store.RecordReference;
 import org.neo4j.kernel.impl.annotations.Documented;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
+import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
@@ -93,7 +94,7 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
     }
 
     <REFERRED extends AbstractBaseRecord> void forReference( RecordReference<REFERRED> other,
-                                                             ComparativeRecordChecker<RECORD, REFERRED, REPORT> checker );
+                                                             ComparativeRecordChecker<RECORD, ? super REFERRED, REPORT> checker );
 
     interface PrimitiveConsistencyReport<RECORD extends PrimitiveRecord, REPORT extends PrimitiveConsistencyReport<RECORD, REPORT>>
             extends ConsistencyReport<RECORD, REPORT>
@@ -114,10 +115,18 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
         @Documented
         void multipleOwners( RelationshipRecord relationship );
 
+        /** The referenced property is owned by the neo store (graph global property). */
+        @Documented
+        void multipleOwners( NeoStoreRecord neoStore );
+
         /** The first property record reference has changed, but the previous first property record has not been updated. */
         @Documented
         @IncrementalOnly
-        void propertyReplacedButNotUpdated();
+        void propertyNotUpdated();
+    }
+
+    interface NeoStoreConsistencyReport extends PrimitiveConsistencyReport<NeoStoreRecord, NeoStoreConsistencyReport>
+    {
     }
 
     interface NodeConsistencyReport extends PrimitiveConsistencyReport<NodeRecord, NodeConsistencyReport>
@@ -141,7 +150,7 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
         /** The first relationship record reference has changed, but the previous first relationship record has not been updates. */
         @Documented
         @IncrementalOnly
-        void relationshipReplacedButNotUpdated();
+        void relationshipNotUpdated();
     }
 
     interface RelationshipConsistencyReport
@@ -222,22 +231,38 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
         /** The previous source relationship reference has changed, but the previously referenced record has not been updated. */
         @Documented
         @IncrementalOnly
-        void sourcePrevReplacedButNotUpdated();
+        void sourcePrevNotUpdated();
 
         /** The next source relationship reference has changed, but the previously referenced record has not been updated. */
         @Documented
         @IncrementalOnly
-        void sourceNextReplacedButNotUpdated();
+        void sourceNextNotUpdated();
 
         /** The previous target relationship reference has changed, but the previously referenced record has not been updated. */
         @Documented
         @IncrementalOnly
-        void targetPrevReplacedButNotUpdated();
+        void targetPrevNotUpdated();
 
         /** The next target relationship reference has changed, but the previously referenced record has not been updated. */
         @Documented
         @IncrementalOnly
-        void targetNextReplacedButNotUpdated();
+        void targetNextNotUpdated();
+
+        /**
+         * This relationship was first in the chain for the source node, and isn't first anymore,
+         * but the source node was not updated.
+         */
+        @Documented
+        @IncrementalOnly
+        void sourceNodeNotUpdated();
+
+        /**
+         * This relationship was first in the chain for the target node, and isn't first anymore,
+         * but the target node was not updated.
+         */
+        @Documented
+        @IncrementalOnly
+        void targetNodeNotUpdated();
     }
 
     interface PropertyConsistencyReport extends ConsistencyReport<PropertyRecord, PropertyConsistencyReport>
@@ -252,7 +277,7 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
 
         /** The previous property record is not in use. */
         @Documented
-        void previousNotInUse( PropertyRecord property );
+        void prevNotInUse( PropertyRecord property );
 
         /** The next property record is not in use. */
         @Documented
@@ -297,12 +322,12 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
         /** The previous reference has changed, but the referenced record has not been updated. */
         @Documented
         @IncrementalOnly
-        void previousReplacedButNotUpdated();
+        void prevNotUpdated();
 
         /** The next reference has changed, but the referenced record has not been updated. */
         @Documented
         @IncrementalOnly
-        void nextReplacedButNotUpdated();
+        void nextNotUpdated();
 
         /** The string property is not referenced anymore, but the corresponding block has not been deleted. */
         @Documented
@@ -313,6 +338,22 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
         @Documented
         @IncrementalOnly
         void arrayUnreferencedButNotDeleted( PropertyBlock block );
+
+        /**
+         * This property was declared to be changed for a node or relationship, but that node or relationship does not
+         * contain this property in its property chain.
+         */
+        @Documented
+        @IncrementalOnly
+        void ownerDoesNotReferenceBack();
+
+        /**
+         * This property was declared to be changed for a node or relationship, but that node or relationship did not
+         * contain this property in its property chain prior to the change. The property is referenced by another owner.
+         */
+        @Documented
+        @IncrementalOnly
+        void changedForWrongOwner();
     }
 
     interface LabelConsistencyReport extends ConsistencyReport<RelationshipTypeRecord, LabelConsistencyReport>
@@ -367,5 +408,10 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
         /** The next block references this (the same) record. */
         @Documented
         void selfReferentialNext();
+
+        /** The next block reference was changed, but the previously referenced block was not updated. */
+        @Documented
+        @IncrementalOnly
+        void nextNotUpdated();
     }
 }

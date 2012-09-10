@@ -50,7 +50,7 @@ public class NodeRecordCheck extends PrimitiveRecordCheck<NodeRecord, Consistenc
 
             @Override
             public void checkReference( NodeRecord node, RelationshipRecord relationship,
-                                        ConsistencyReport.NodeConsistencyReport report )
+                                        ConsistencyReport.NodeConsistencyReport report, RecordAccess records )
             {
                 if ( !relationship.inUse() )
                 {
@@ -86,28 +86,25 @@ public class NodeRecordCheck extends PrimitiveRecordCheck<NodeRecord, Consistenc
             }
 
             @Override
+            public void checkChange( NodeRecord oldRecord, NodeRecord newRecord,
+                                     ConsistencyReport.NodeConsistencyReport report,
+                                     DiffRecordAccess records )
+            {
+                if ( !newRecord.inUse() || valueFrom( oldRecord ) != valueFrom( newRecord ) )
+                {
+                    if ( !Record.NO_NEXT_RELATIONSHIP.is( valueFrom( oldRecord ) )
+                         && records.changedRelationship( valueFrom( oldRecord ) ) == null )
+                    {
+                        report.relationshipNotUpdated();
+                    }
+                }
+            }
+
+            @Override
             public long valueFrom( NodeRecord record )
             {
                 return record.getNextRel();
             }
-
-            @Override
-            public boolean isNone( NodeRecord record )
-            {
-                return Record.NO_NEXT_RELATIONSHIP.is( record.getNextRel() );
-            }
-
-            @Override
-            public boolean referencedRecordChanged( DiffRecordAccess records, NodeRecord record )
-            {
-                return records.changedRelationship( record.getNextRel() ) != null;
-            }
-
-            @Override
-            public void reportReplacedButNotUpdated( ConsistencyReport.NodeConsistencyReport report )
-            {
-                report.relationshipReplacedButNotUpdated();
-            }
-        };
+        }
     }
 }

@@ -23,6 +23,7 @@ import org.neo4j.backup.consistency.RecordType;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
 import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
+import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
@@ -35,18 +36,22 @@ import static org.neo4j.backup.consistency.checking.DynamicRecordCheck.StoreDere
 
 public abstract class AbstractStoreProcessor extends RecordStore.Processor
 {
+    private final RecordCheck<NeoStoreRecord, ConsistencyReport.NeoStoreConsistencyReport> neoStoreChecker;
     private final RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker;
     private final RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> relationshipChecker;
     private final RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> propertyChecker;
     private final RecordCheck<PropertyIndexRecord, ConsistencyReport.PropertyKeyConsistencyReport> propertyKeyChecker;
     private final RecordCheck<RelationshipTypeRecord, ConsistencyReport.LabelConsistencyReport> relationshipLabelChecker;
 
-    public AbstractStoreProcessor( RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker,
-                                   RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> relationshipChecker,
-                                   RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> propertyChecker,
-                                   RecordCheck<PropertyIndexRecord, ConsistencyReport.PropertyKeyConsistencyReport> propertyKeyChecker,
-                                   RecordCheck<RelationshipTypeRecord, ConsistencyReport.LabelConsistencyReport> relationshipLabelChecker )
+    public AbstractStoreProcessor(
+            RecordCheck<NeoStoreRecord, ConsistencyReport.NeoStoreConsistencyReport> neoStoreChecker,
+            RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker,
+            RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> relationshipChecker,
+            RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> propertyChecker,
+            RecordCheck<PropertyIndexRecord, ConsistencyReport.PropertyKeyConsistencyReport> propertyKeyChecker,
+            RecordCheck<RelationshipTypeRecord, ConsistencyReport.LabelConsistencyReport> relationshipLabelChecker )
     {
+        this.neoStoreChecker = neoStoreChecker;
         this.nodeChecker = nodeChecker;
         this.relationshipChecker = relationshipChecker;
         this.propertyChecker = propertyChecker;

@@ -1,6 +1,7 @@
 package org.neo4j.backup.consistency.report;
 
 import org.neo4j.backup.consistency.checking.ComparativeRecordChecker;
+import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 
 public class PendingReferenceCheck<REFERENCED extends AbstractBaseRecord>
@@ -14,9 +15,23 @@ public class PendingReferenceCheck<REFERENCED extends AbstractBaseRecord>
         this.checker = checker;
     }
 
-    public void checkReference( REFERENCED referenced )
+    public void checkReference( REFERENCED referenced, RecordAccess records )
     {
-        ConsistencyReporter.dispatchReference( report(), checker, referenced );
+        ConsistencyReporter.dispatchReference( report(), checker, referenced, records );
+    }
+
+    public void checkDiffReference( REFERENCED oldReferenced, REFERENCED newReferenced, RecordAccess records )
+    {
+        ConsistencyReporter.dispatchChangeReference( report(), checker, oldReferenced, newReferenced, records );
+    }
+
+    public synchronized void skip()
+    {
+        if ( report != null )
+        {
+            ConsistencyReporter.dispatchSkip( report );
+            report = null;
+        }
     }
 
     private synchronized ConsistencyReport report()
@@ -31,20 +46,6 @@ public class PendingReferenceCheck<REFERENCED extends AbstractBaseRecord>
         }
         finally
         {
-            report = null;
-        }
-    }
-
-    public void checkDiffReference( REFERENCED oldReferenced, REFERENCED newReferenced )
-    {
-        ConsistencyReporter.dispatchChangeReference( report(), checker, oldReferenced, newReferenced );
-    }
-
-    public synchronized void skip()
-    {
-        if ( report != null )
-        {
-            ConsistencyReporter.dispatchSkip( report );
             report = null;
         }
     }

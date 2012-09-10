@@ -21,6 +21,7 @@ package org.neo4j.backup.consistency.checking.incremental;
 
 import org.neo4j.backup.consistency.RecordType;
 import org.neo4j.backup.consistency.checking.AbstractStoreProcessor;
+import org.neo4j.backup.consistency.checking.NeoStoreCheck;
 import org.neo4j.backup.consistency.checking.NodeRecordCheck;
 import org.neo4j.backup.consistency.checking.PropertyKeyRecordCheck;
 import org.neo4j.backup.consistency.checking.PropertyRecordCheck;
@@ -42,7 +43,8 @@ class StoreProcessor extends AbstractStoreProcessor
 
     StoreProcessor( ConsistencyReport.Reporter report )
     {
-        super( new NodeRecordCheck(),
+        super( new NeoStoreCheck(),
+               new NodeRecordCheck(),
                new RelationshipRecordCheck(),
                new PropertyRecordCheck(),
                new PropertyKeyRecordCheck(),

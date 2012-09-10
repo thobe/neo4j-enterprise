@@ -47,6 +47,7 @@ import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.backup.consistency.store.RecordReference;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
+import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
@@ -130,21 +131,32 @@ public class ConsistencyReporterTest
     @RunWith(Parameterized.class)
     public static class TestAllReportMessages implements Answer
     {
+        private static final boolean LOG_MESSAGE_SAMPLES = false;
+
         @Test
         public void shouldLogInconsistency() throws Exception
         {
             // given
             StringBuffer result = new StringBuffer();
             StringLogger logger = StringLogger.wrap( result );
-            ConsistencyReport.Reporter reporter = new ConsistencyReporter( logger,
-                                                                           mock( DiffRecordAccess.class ) );
+            ConsistencyReport.Reporter reporter = new ConsistencyReporter(
+                    logger, mock( DiffRecordAccess.class ) );
 
             // when
             reportMethod.invoke( reporter, parameters( reportMethod ) );
 
             // then
-            assertThat( result.toString(), containsString( " // " ) );
-            // System.out.println( this + ": \n\t" + result );
+            String message = result.toString();
+            assertThat( message, containsMessage( this.toString() ) );
+
+            if ( LOG_MESSAGE_SAMPLES )
+            {
+                System.out.println( this + ":" );
+                for ( String line : message.split( "\n" ) )
+                {
+                    System.out.println( "\t" + line );
+                }
+            }
         }
 
         private final Method reportMethod;
@@ -204,8 +216,7 @@ public class ConsistencyReporterTest
         @Override
         public String toString()
         {
-
-            return String.format( "report.%s(%s{ reporter.%s(); })",
+            return String.format( "report.%s( %s{ reporter.%s(); } )",
                                   reportMethod.getName(), signatureOf( reportMethod ), method.getName() );
         }
 
@@ -270,6 +281,10 @@ public class ConsistencyReporterTest
             {
                 return new DynamicRecord( 0 );
             }
+            if ( type == NeoStoreRecord.class )
+            {
+                return new NeoStoreRecord();
+            }
             throw new IllegalArgumentException( type.getName() );
         }
 
@@ -293,23 +308,24 @@ public class ConsistencyReporterTest
             Object[] arguments = invocation.getArguments();
             return method.invoke( arguments[arguments.length - 2], parameters( method ) );
         }
+    }
 
-        private static Matcher<String> containsString( final String substring )
+    private static Matcher<String> containsMessage( final String descr )
+    {
+        return new TypeSafeMatcher<String>()
         {
-            return new TypeSafeMatcher<String>()
+            @Override
+            public boolean matchesSafely( String item )
             {
-                @Override
-                public boolean matchesSafely( String item )
-                {
-                    return item.contains( substring );
-                }
+                item = item.split( "\n" )[0];
+                return item.split( "(ERROR|WARNING): " )[1].contains( " " );
+            }
 
-                @Override
-                public void describeTo( Description description )
-                {
-                    description.appendText( "String containing substring " ).appendValue( substring );
-                }
-            };
-        }
+            @Override
+            public void describeTo( Description description )
+            {
+                description.appendText( "String containing a message for " ).appendText( descr );
+            }
+        };
     }
 }

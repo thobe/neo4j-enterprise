@@ -29,6 +29,7 @@ import org.neo4j.backup.consistency.RecordType;
 import org.neo4j.backup.consistency.checking.ComparativeRecordChecker;
 import org.neo4j.backup.consistency.checking.RecordCheck;
 import org.neo4j.backup.consistency.store.DiffRecordAccess;
+import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.backup.consistency.store.RecordReference;
 import org.neo4j.kernel.impl.annotations.Documented;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
@@ -109,18 +110,19 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
     }
 
     static void dispatchReference( ConsistencyReport report, ComparativeRecordChecker checker,
-                                   AbstractBaseRecord referenced )
+                                   AbstractBaseRecord referenced, RecordAccess records )
     {
         ReportInvocationHandler handler = (ReportInvocationHandler) getInvocationHandler( report );
-        handler.checkReference( report, checker, referenced );
+        handler.checkReference( report, checker, referenced, records );
         handler.updateSummary();
     }
 
     static void dispatchChangeReference( ConsistencyReport report, ComparativeRecordChecker checker,
-                                         AbstractBaseRecord oldReferenced, AbstractBaseRecord newReferenced )
+                                         AbstractBaseRecord oldReferenced, AbstractBaseRecord newReferenced,
+                                         RecordAccess records )
     {
         ReportInvocationHandler handler = (ReportInvocationHandler) getInvocationHandler( report );
-        handler.checkDiffReference( report, checker, oldReferenced, newReferenced );
+        handler.checkDiffReference( report, checker, oldReferenced, newReferenced, records );
         handler.updateSummary();
     }
 
@@ -178,18 +180,23 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
                     warnings++;
                     message.append( "WARNING: " );
                 }
+                Documented annotation = method.getAnnotation( Documented.class );
+                if ( annotation != null && !"".equals( annotation.value() ) )
+                {
+                    message.append( annotation.value() );
+                }
+                else
+                {
+                    message.append( method.getName() );
+                }
                 emitRecord( message );
                 if ( args != null )
                 {
+                    message.append( "\n\tInconsistent with: " );
                     for ( Object arg : args )
                     {
                         message.append( arg ).append( ' ' );
                     }
-                }
-                Documented annotation = method.getAnnotation( Documented.class );
-                if ( annotation != null && !"".equals( annotation.value() ) )
-                {
-                    message.append( "// " ).append( annotation.value() );
                 }
                 logger.logMessage( message.toString() );
             }
@@ -214,10 +221,11 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
         abstract void emitRecord( StringBuilder message );
 
         abstract void checkReference( ConsistencyReport report, ComparativeRecordChecker checker,
-                                      AbstractBaseRecord referenced );
+                                      AbstractBaseRecord referenced, RecordAccess records );
 
         abstract void checkDiffReference( ConsistencyReport report, ComparativeRecordChecker checker,
-                                          AbstractBaseRecord oldReferenced, AbstractBaseRecord newReferenced );
+                                          AbstractBaseRecord oldReferenced, AbstractBaseRecord newReferenced,
+                                          RecordAccess records );
     }
 
     static class ReportHandler extends ReportInvocationHandler
@@ -234,22 +242,24 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
         @Override
         void emitRecord( StringBuilder message )
         {
-            message.append( record ).append( ' ' );
+            message.append( "\n\t" ).append( record );
         }
 
         @Override
         @SuppressWarnings("unchecked")
-        void checkReference( ConsistencyReport report, ComparativeRecordChecker checker, AbstractBaseRecord referenced )
+        void checkReference( ConsistencyReport report, ComparativeRecordChecker checker, AbstractBaseRecord referenced,
+                             RecordAccess records )
         {
-            checker.checkReference( record, referenced, report );
+            checker.checkReference( record, referenced, report, records );
         }
 
         @Override
         @SuppressWarnings("unchecked")
         void checkDiffReference( ConsistencyReport report, ComparativeRecordChecker checker,
-                                 AbstractBaseRecord oldReferenced, AbstractBaseRecord newReferenced )
+                                 AbstractBaseRecord oldReferenced, AbstractBaseRecord newReferenced,
+                                 RecordAccess records )
         {
-            checker.checkReference( record, newReferenced, report );
+            checker.checkReference( record, newReferenced, report, records );
         }
     }
 
@@ -269,22 +279,25 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
         @Override
         void emitRecord( StringBuilder message )
         {
-            message.append( newRecord ).append( ' ' );
+            message.append( "\n\t- " ).append( oldRecord );
+            message.append( "\n\t+ " ).append( newRecord );
         }
 
         @Override
         @SuppressWarnings("unchecked")
-        void checkReference( ConsistencyReport report, ComparativeRecordChecker checker, AbstractBaseRecord referenced )
+        void checkReference( ConsistencyReport report, ComparativeRecordChecker checker, AbstractBaseRecord referenced,
+                             RecordAccess records )
         {
-            checker.checkReference( newRecord, referenced, report );
+            checker.checkReference( newRecord, referenced, report, records );
         }
 
         @Override
         @SuppressWarnings("unchecked")
         void checkDiffReference( ConsistencyReport report, ComparativeRecordChecker checker,
-                                 AbstractBaseRecord oldReferenced, AbstractBaseRecord newReferenced )
+                                 AbstractBaseRecord oldReferenced, AbstractBaseRecord newReferenced,
+                                 RecordAccess records )
         {
-            checker.checkReference( newRecord, newReferenced, report );
+            checker.checkReference( newRecord, newReferenced, report, records );
         }
     }
 

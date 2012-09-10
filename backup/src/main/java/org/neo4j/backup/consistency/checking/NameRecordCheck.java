@@ -50,7 +50,7 @@ abstract class NameRecordCheck<RECORD extends AbstractNameRecord, REPORT extends
     }
 
     @Override
-    public void checkReference( RECORD record, DynamicRecord name, REPORT report )
+    public void checkReference( RECORD record, DynamicRecord name, REPORT report, RecordAccess records )
     {
         if ( !name.inUse() )
         {

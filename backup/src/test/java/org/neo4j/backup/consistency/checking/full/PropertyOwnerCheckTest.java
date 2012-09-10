@@ -20,6 +20,7 @@
 package org.neo4j.backup.consistency.checking.full;
 
 import org.junit.Test;
+import org.neo4j.backup.consistency.checking.NeoStoreCheck;
 import org.neo4j.backup.consistency.checking.NodeRecordCheck;
 import org.neo4j.backup.consistency.checking.RecordCheck;
 import org.neo4j.backup.consistency.checking.RelationshipRecordCheck;
@@ -28,6 +29,7 @@ import org.neo4j.backup.consistency.store.DiffRecordAccess;
 import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.backup.consistency.store.RecordAccessStub;
 import org.neo4j.helpers.progress.ProgressMonitorFactory;
+import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
@@ -39,6 +41,7 @@ import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.NONE;
 import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.check;
 import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.inUse;
 import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.notInUse;
+import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.verifyOnlyReferenceDispatch;
 
 public class PropertyOwnerCheckTest
 {
@@ -214,6 +217,35 @@ public class PropertyOwnerCheckTest
     }
 
     @Test
+    public void shouldReportRelationshipWithReferenceToTheGraphGlobalChain() throws Exception
+    {
+        // given
+        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> relationshipChecker =
+                decorator.decorateRelationshipChecker( relationshipChecker() );
+        RecordCheck<NeoStoreRecord, ConsistencyReport.NeoStoreConsistencyReport> neoStoreCheck =
+                decorator.decorateNeoStoreChecker( neoStoreCheck() );
+
+        RecordAccessStub records = new RecordAccessStub();
+
+        NeoStoreRecord master = records.add( new NeoStoreRecord() );
+        master.setNextProp( 7 );
+        RelationshipRecord relationship = records.add( inUse( new RelationshipRecord( 1, 0, 1, 0 ) ) );
+        relationship.setNextProp( 7 );
+
+        // when
+        ConsistencyReport.NeoStoreConsistencyReport masterReport =
+                check( ConsistencyReport.NeoStoreConsistencyReport.class, neoStoreCheck, master, records );
+        ConsistencyReport.RelationshipConsistencyReport relationshipReport =
+                check( ConsistencyReport.RelationshipConsistencyReport.class,
+                       relationshipChecker, relationship, records );
+
+        // then
+        verifyZeroInteractions( masterReport );
+        verify( relationshipReport ).multipleOwners( master );
+    }
+
+    @Test
     public void shouldReportNodeWithSamePropertyChainAsRelationship() throws Exception
     {
         // given
@@ -242,6 +274,89 @@ public class PropertyOwnerCheckTest
     }
 
     @Test
+    public void shouldReportNodeWithReferenceToTheGraphGlobalChain() throws Exception
+    {
+        // given
+        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker =
+                decorator.decorateNodeChecker( nodeChecker() );
+        RecordCheck<NeoStoreRecord, ConsistencyReport.NeoStoreConsistencyReport> neoStoreCheck =
+                decorator.decorateNeoStoreChecker( neoStoreCheck() );
+
+        RecordAccessStub records = new RecordAccessStub();
+
+        NodeRecord node = records.add( inUse( new NodeRecord( 1, NONE, 7 ) ) );
+        NeoStoreRecord master = records.add( new NeoStoreRecord() );
+        master.setNextProp( node.getNextProp() );
+
+        // when
+        ConsistencyReport.NeoStoreConsistencyReport masterReport =
+                check( ConsistencyReport.NeoStoreConsistencyReport.class, neoStoreCheck, master, records );
+        ConsistencyReport.NodeConsistencyReport nodeReport =
+                check( ConsistencyReport.NodeConsistencyReport.class, nodeChecker, node, records );
+
+        // then
+        verifyZeroInteractions( masterReport );
+        verify( nodeReport ).multipleOwners( master );
+    }
+
+    @Test
+    public void shouldReportNodeStoreReferencingSameChainAsNode() throws Exception
+    {
+        // given
+        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker =
+                decorator.decorateNodeChecker( nodeChecker() );
+        RecordCheck<NeoStoreRecord, ConsistencyReport.NeoStoreConsistencyReport> neoStoreCheck =
+                decorator.decorateNeoStoreChecker( neoStoreCheck() );
+
+        RecordAccessStub records = new RecordAccessStub();
+
+        NodeRecord node = records.add( inUse( new NodeRecord( 1, NONE, 7 ) ) );
+        NeoStoreRecord master = records.add( new NeoStoreRecord() );
+        master.setNextProp( node.getNextProp() );
+
+        // when
+        ConsistencyReport.NodeConsistencyReport nodeReport =
+                check( ConsistencyReport.NodeConsistencyReport.class, nodeChecker, node, records );
+        ConsistencyReport.NeoStoreConsistencyReport masterReport =
+                check( ConsistencyReport.NeoStoreConsistencyReport.class, neoStoreCheck, master, records );
+
+        // then
+        verifyZeroInteractions( nodeReport );
+        verify( masterReport ).multipleOwners( node );
+    }
+
+    @Test
+    public void shouldReportNodeStoreReferencingSameChainAsRelationship() throws Exception
+    {
+        // given
+        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> relationshipChecker =
+                decorator.decorateRelationshipChecker( relationshipChecker() );
+        RecordCheck<NeoStoreRecord, ConsistencyReport.NeoStoreConsistencyReport> neoStoreCheck =
+                decorator.decorateNeoStoreChecker( neoStoreCheck() );
+
+        RecordAccessStub records = new RecordAccessStub();
+
+        NeoStoreRecord master = records.add( new NeoStoreRecord() );
+        master.setNextProp( 7 );
+        RelationshipRecord relationship = records.add( inUse( new RelationshipRecord( 1, 0, 1, 0 ) ) );
+        relationship.setNextProp( 7 );
+
+        // when
+        ConsistencyReport.RelationshipConsistencyReport relationshipReport =
+                check( ConsistencyReport.RelationshipConsistencyReport.class,
+                       relationshipChecker, relationship, records );
+        ConsistencyReport.NeoStoreConsistencyReport masterReport =
+                check( ConsistencyReport.NeoStoreConsistencyReport.class, neoStoreCheck, master, records );
+
+        // then
+        verifyZeroInteractions( relationshipReport );
+        verify( masterReport ).multipleOwners( relationship );
+    }
+
+    @Test
     public void shouldReportOrphanPropertyChain() throws Exception
     {
         // given
@@ -261,6 +376,109 @@ public class PropertyOwnerCheckTest
 
         // then
         verify( report ).orphanPropertyChain();
+    }
+
+    @Test
+    public void shouldNotReportOrphanIfOwnedByNode() throws Exception
+    {
+        // given
+        RecordAccessStub records = new RecordAccessStub();
+        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+
+        PropertyRecord record = inUse( new PropertyRecord( 42 ) );
+        ConsistencyReport.PropertyConsistencyReport report =
+                check( ConsistencyReport.PropertyConsistencyReport.class,
+                       decorator.decoratePropertyChecker( propertyChecker() ),
+                       record, records );
+        ConsistencyReport.NodeConsistencyReport nodeReport =
+                check( ConsistencyReport.NodeConsistencyReport.class,
+                       decorator.decorateNodeChecker( nodeChecker() ),
+                       inUse( new NodeRecord( 10, NONE, 42 ) ), records );
+
+        // when
+        decorator.scanForOrphanChains( ProgressMonitorFactory.NONE );
+
+        records.checkDeferred();
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+        verifyOnlyReferenceDispatch( nodeReport );
+    }
+
+    @Test
+    public void shouldNotReportOrphanIfOwnedByRelationship() throws Exception
+    {
+        // given
+        RecordAccessStub records = new RecordAccessStub();
+        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+
+        PropertyRecord record = inUse( new PropertyRecord( 42 ) );
+        ConsistencyReport.PropertyConsistencyReport report =
+                check( ConsistencyReport.PropertyConsistencyReport.class,
+                       decorator.decoratePropertyChecker( propertyChecker() ),
+                       record, records );
+        RelationshipRecord relationship = inUse( new RelationshipRecord( 10, 1, 1, 0 ) );
+        relationship.setNextProp( 42 );
+        ConsistencyReport.RelationshipConsistencyReport relationshipReport =
+                check( ConsistencyReport.RelationshipConsistencyReport.class,
+                       decorator.decorateRelationshipChecker( relationshipChecker() ),
+                       relationship, records );
+
+        // when
+        decorator.scanForOrphanChains( ProgressMonitorFactory.NONE );
+
+        records.checkDeferred();
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+        verifyOnlyReferenceDispatch( relationshipReport );
+    }
+
+    @Test
+    public void shouldNotReportOrphanIfOwnedByNeoStore() throws Exception
+    {
+        // given
+        RecordAccessStub records = new RecordAccessStub();
+        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+
+        PropertyRecord record = inUse( new PropertyRecord( 42 ) );
+        ConsistencyReport.PropertyConsistencyReport report =
+                check( ConsistencyReport.PropertyConsistencyReport.class,
+                       decorator.decoratePropertyChecker( propertyChecker() ),
+                       record, records );
+        NeoStoreRecord master = inUse( new NeoStoreRecord() );
+        master.setNextProp( 42 );
+        ConsistencyReport.NeoStoreConsistencyReport masterReport =
+                check( ConsistencyReport.NeoStoreConsistencyReport.class,
+                       decorator.decorateNeoStoreChecker( neoStoreCheck() ),
+                       master, records );
+
+        // when
+        decorator.scanForOrphanChains( ProgressMonitorFactory.NONE );
+
+        records.checkDeferred();
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+        verifyOnlyReferenceDispatch( masterReport );
+    }
+
+    private static NeoStoreCheck neoStoreCheck()
+    {
+        return new NeoStoreCheck()
+        {
+            @Override
+            public void check( NeoStoreRecord record, ConsistencyReport.NeoStoreConsistencyReport report,
+                               RecordAccess records )
+            {
+            }
+
+            @Override
+            public void checkChange( NeoStoreRecord oldRecord, NeoStoreRecord newRecord,
+                                     ConsistencyReport.NeoStoreConsistencyReport report, DiffRecordAccess records )
+            {
+            }
+        };
     }
 
     private static NodeRecordCheck nodeChecker()

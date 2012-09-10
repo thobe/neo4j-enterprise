@@ -21,6 +21,7 @@ package org.neo4j.backup.consistency.checking.full;
 
 import org.neo4j.backup.consistency.RecordType;
 import org.neo4j.backup.consistency.checking.AbstractStoreProcessor;
+import org.neo4j.backup.consistency.checking.NeoStoreCheck;
 import org.neo4j.backup.consistency.checking.NodeRecordCheck;
 import org.neo4j.backup.consistency.checking.PropertyKeyRecordCheck;
 import org.neo4j.backup.consistency.checking.PropertyRecordCheck;
@@ -49,11 +50,12 @@ class StoreProcessor extends AbstractStoreProcessor
 
     private StoreProcessor( PropertyOwnerCheck ownerCheck, ConsistencyReport.Reporter report )
     {
-        super( ownerCheck.decorateNodeChecker( new NodeRecordCheck() ),
+        super( ownerCheck.decorateNeoStoreChecker( new NeoStoreCheck() ),
+               ownerCheck.decorateNodeChecker( new NodeRecordCheck() ),
                ownerCheck.decorateRelationshipChecker( new RelationshipRecordCheck() ),
                ownerCheck.decoratePropertyChecker( new PropertyRecordCheck() ),
-               new PropertyKeyRecordCheck(),
-               new RelationshipLabelRecordCheck() );
+               ownerCheck.decoratePropertyKeyChecker( new PropertyKeyRecordCheck() ),
+               ownerCheck.decorateLabelChecker( new RelationshipLabelRecordCheck() ) );
         this.report = report;
         this.ownerCheck = ownerCheck;
     }
@@ -81,7 +83,7 @@ class StoreProcessor extends AbstractStoreProcessor
     protected void checkProperty( RecordStore<PropertyRecord> store, PropertyRecord property,
                                   RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> checker )
     {
-        report.forProperty( property,checker );
+        report.forProperty( property, checker );
     }
 
     @Override

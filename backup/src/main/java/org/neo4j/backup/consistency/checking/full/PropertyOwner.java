@@ -3,6 +3,7 @@ package org.neo4j.backup.consistency.checking.full;
 import org.neo4j.backup.consistency.report.PendingReferenceCheck;
 import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.backup.consistency.store.RecordReference;
+import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
@@ -20,9 +21,9 @@ abstract class PropertyOwner<RECORD extends PrimitiveRecord>
     {
         private final long id;
 
-        OwningNode( long id )
+        OwningNode( NodeRecord record )
         {
-            this.id = id;
+            this.id = record.getId();
         }
 
         @Override
@@ -36,9 +37,9 @@ abstract class PropertyOwner<RECORD extends PrimitiveRecord>
     {
         private final long id;
 
-        OwningRelationship( long id )
+        OwningRelationship( RelationshipRecord record )
         {
-            this.id = id;
+            this.id = record.getId();
         }
 
         @Override
@@ -48,6 +49,15 @@ abstract class PropertyOwner<RECORD extends PrimitiveRecord>
         }
     }
 
+    static final PropertyOwner<NeoStoreRecord> OWNING_GRAPH = new PropertyOwner<NeoStoreRecord>()
+    {
+        @Override
+        RecordReference<NeoStoreRecord> record( RecordAccess records )
+        {
+            return records.graph();
+        }
+    };
+
     static class UnknownOwner extends PropertyOwner<PrimitiveRecord> implements RecordReference<PrimitiveRecord>
     {
         private PendingReferenceCheck<PrimitiveRecord> reporter;
@@ -55,7 +65,10 @@ abstract class PropertyOwner<RECORD extends PrimitiveRecord>
         @Override
         RecordReference<PrimitiveRecord> record( RecordAccess records )
         {
-            this.skip();
+            // Getting the record for this owner means that some other owner replaced it
+            // that means that it isn't an orphan, so we skip this orphan check
+            // and return a record for conflict check that always is ok (by skipping the check)
+            this.markInCustody();
             return SKIP;
         }
 
@@ -70,11 +83,11 @@ abstract class PropertyOwner<RECORD extends PrimitiveRecord>
             }
             if ( reporter != null )
             {
-                reporter.checkReference( null );
+                reporter.checkReference( null, null );
             }
         }
 
-        synchronized void skip()
+        synchronized void markInCustody()
         {
             if ( reporter != null )
             {
@@ -98,4 +111,9 @@ abstract class PropertyOwner<RECORD extends PrimitiveRecord>
             reporter.skip();
         }
     };
+
+    private PropertyOwner()
+    {
+        // only internal subclasses
+    }
 }

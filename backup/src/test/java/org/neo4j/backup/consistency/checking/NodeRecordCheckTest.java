@@ -217,6 +217,99 @@ public class NodeRecordCheckTest
     }
 
     @Test
+    public void shouldReportProblemsWithTheNewStateWhenCheckingChanges() throws Exception
+    {
+        // given
+        NodeRecord oldNode = notInUse( new NodeRecord( 42, 0, 0 ) );
+        NodeRecord newNode = inUse( new NodeRecord( 42, 1, 2 ) );
+        RelationshipRecord relationship = add( notInUse( new RelationshipRecord( 1, 0, 0, 0 ) ) );
+        PropertyRecord property = add( notInUse( new PropertyRecord( 2 ) ) );
+
+        // when
+        ConsistencyReport.NodeConsistencyReport report = checkChange( oldNode, newNode );
+
+        // then
+        verify( report ).relationshipNotInUse( relationship );
+        verify( report ).propertyNotInUse( property );
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldNotReportAnythingWhenAddingAnInitialProperty() throws Exception
+    {
+        // given
+        NodeRecord oldNode = inUse( new NodeRecord( 42, NONE, NONE ) );
+        NodeRecord newNode = inUse( new NodeRecord( 42, NONE, 10 ) );
+
+       addChange( notInUse( new PropertyRecord( 10 ) ), inUse( new PropertyRecord( 10 ) ) );
+
+        // when
+        ConsistencyReport.NodeConsistencyReport report = checkChange( oldNode, newNode );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldNotReportAnythingWhenChangingProperty() throws Exception
+    {
+        // given
+        NodeRecord oldNode = inUse( new NodeRecord( 42, NONE, 10 ) );
+        NodeRecord newNode = inUse( new NodeRecord( 42, NONE, 11 ) );
+
+        PropertyRecord oldProp = addChange( inUse( new PropertyRecord( 10 ) ),
+                                            inUse( new PropertyRecord( 10 ) ) );
+        PropertyRecord newProp = addChange( notInUse( new PropertyRecord( 11 ) ),
+                                            inUse( new PropertyRecord( 11 ) ) );
+        oldProp.setPrevProp( newProp.getId() );
+        newProp.setNextProp( oldProp.getId() );
+
+        // when
+        ConsistencyReport.NodeConsistencyReport report = checkChange( oldNode, newNode );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldNotReportAnythingWhenAddingAnInitialRelationship() throws Exception
+    {
+        // given
+        NodeRecord oldNode = inUse( new NodeRecord( 42, NONE, NONE ) );
+        NodeRecord newNode = inUse( new NodeRecord( 42, 10, NONE ) );
+
+        addChange( notInUse( new RelationshipRecord( 10, 0, 0, 0 ) ),
+                   inUse( new RelationshipRecord( 10, 42, 1, 0 ) ) );
+
+        // when
+        ConsistencyReport.NodeConsistencyReport report = checkChange( oldNode, newNode );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldNotReportAnythingWhenChangingRelationship() throws Exception
+    {
+        // given
+        NodeRecord oldNode = inUse( new NodeRecord( 42, 9, NONE ) );
+        NodeRecord newNode = inUse( new NodeRecord( 42, 10, NONE ) );
+
+        RelationshipRecord rel1 = addChange( inUse( new RelationshipRecord( 9, 42, 0, 0 ) ),
+                                             inUse( new RelationshipRecord( 9, 42, 0, 0 ) ) );
+        RelationshipRecord rel2 = addChange( notInUse( new RelationshipRecord( 10, 0, 0, 0 ) ),
+                                             inUse( new RelationshipRecord( 10, 42, 1, 0 ) ) );
+        rel1.setFirstPrevRel( rel2.getId() );
+        rel2.setFirstNextRel( rel1.getId() );
+
+        // when
+        ConsistencyReport.NodeConsistencyReport report = checkChange( oldNode, newNode );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
     public void shouldReportPropertyChainReplacedButNotUpdated() throws Exception
     {
         // given
@@ -229,7 +322,7 @@ public class NodeRecordCheckTest
         ConsistencyReport.NodeConsistencyReport report = checkChange( oldNode, newNode );
 
         // then
-        verify( report ).propertyReplacedButNotUpdated();
+        verify( report ).propertyNotUpdated();
         verifyOnlyReferenceDispatch( report );
     }
 
@@ -246,7 +339,23 @@ public class NodeRecordCheckTest
         ConsistencyReport.NodeConsistencyReport report = checkChange( oldNode, newNode );
 
         // then
-        verify( report ).relationshipReplacedButNotUpdated();
+        verify( report ).relationshipNotUpdated();
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportDeletedButReferencesNotUpdated() throws Exception
+    {
+        // given
+        NodeRecord oldNode = inUse( new NodeRecord( 42, 1, 10 ) );
+        NodeRecord newNode = notInUse( new NodeRecord( 42, 1, 10 ) );
+
+        // when
+        ConsistencyReport.NodeConsistencyReport report = checkChange( oldNode, newNode );
+
+        // then
+        verify( report ).relationshipNotUpdated();
+        verify( report ).propertyNotUpdated();
         verifyOnlyReferenceDispatch( report );
     }
 }

@@ -81,8 +81,9 @@ enum RelationshipNodeField implements
         }
 
         @Override
-        public void reportReplacedButNotUpdated( ConsistencyReport.RelationshipConsistencyReport report )
+        void notUpdated( ConsistencyReport.RelationshipConsistencyReport report )
         {
+            report.sourceNodeNotUpdated();
         }
     },
     TARGET
@@ -136,8 +137,9 @@ enum RelationshipNodeField implements
         }
 
         @Override
-        public void reportReplacedButNotUpdated( ConsistencyReport.RelationshipConsistencyReport report )
+        void notUpdated( ConsistencyReport.RelationshipConsistencyReport report )
         {
+            report.targetNodeNotUpdated();
         }
     };
 
@@ -185,20 +187,8 @@ enum RelationshipNodeField implements
     }
 
     @Override
-    public boolean isNone( RelationshipRecord record )
-    {
-        return false;
-    }
-
-    @Override
-    public boolean referencedRecordChanged( DiffRecordAccess records, RelationshipRecord record )
-    {
-        return records.changedNode( valueFrom( record ) ) != null;
-    }
-
-    @Override
     public void checkReference( RelationshipRecord relationship, NodeRecord node,
-                                ConsistencyReport.RelationshipConsistencyReport report )
+                                ConsistencyReport.RelationshipConsistencyReport report, RecordAccess records )
     {
         if ( !node.inUse() )
         {
@@ -222,6 +212,26 @@ enum RelationshipNodeField implements
             }
         }
     }
+
+    @Override
+    public void checkChange( RelationshipRecord oldRecord, RelationshipRecord newRecord,
+                             ConsistencyReport.RelationshipConsistencyReport report, DiffRecordAccess records )
+    {
+        if ( Record.NO_PREV_RELATIONSHIP.is( prev( oldRecord ) ) )
+        {
+            if ( !newRecord.inUse()
+                 || valueFrom( oldRecord ) != valueFrom( newRecord )
+                 || prev( oldRecord ) != prev( newRecord ) )
+            {
+                if ( records.changedNode( valueFrom( oldRecord ) ) == null )
+                {
+                    notUpdated(report);
+                }
+            }
+        }
+    }
+
+    abstract void notUpdated( ConsistencyReport.RelationshipConsistencyReport report );
 
     abstract void illegalNode( ConsistencyReport.RelationshipConsistencyReport report );
 

@@ -24,6 +24,7 @@ import java.util.Arrays;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
 import org.neo4j.backup.consistency.store.DiffRecordAccess;
 import org.neo4j.backup.consistency.store.RecordAccess;
+import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
@@ -39,7 +40,7 @@ public abstract class PrimitiveRecordCheck
             new ComparativeRecordChecker<RECORD, PrimitiveRecord, REPORT>()
             {
                 @Override
-                public void checkReference( RECORD record, PrimitiveRecord other, REPORT report )
+                public void checkReference( RECORD record, PrimitiveRecord other, REPORT report, RecordAccess records )
                 {
                     if ( other instanceof NodeRecord )
                     {
@@ -48,6 +49,10 @@ public abstract class PrimitiveRecordCheck
                     else if ( other instanceof RelationshipRecord )
                     {
                         report.multipleOwners( (RelationshipRecord) other );
+                    }
+                    else if ( other instanceof NeoStoreRecord )
+                    {
+                        report.multipleOwners( (NeoStoreRecord) other );
                     }
                 }
             };
@@ -77,25 +82,20 @@ public abstract class PrimitiveRecordCheck
         }
 
         @Override
-        public boolean isNone( RECORD record )
+        public void checkChange( RECORD oldRecord, RECORD newRecord, REPORT report, DiffRecordAccess records )
         {
-            return Record.NO_NEXT_PROPERTY.is( record.getNextProp() );
+            if ( !newRecord.inUse() || valueFrom( oldRecord ) != valueFrom( newRecord ) )
+            {
+                if ( !Record.NO_NEXT_PROPERTY.is( valueFrom( oldRecord ) )
+                     && records.changedProperty( valueFrom( oldRecord ) ) == null )
+                {
+                    report.propertyNotUpdated();
+                }
+            }
         }
 
         @Override
-        public boolean referencedRecordChanged( DiffRecordAccess records, RECORD record )
-        {
-            return records.changedProperty( record.getNextProp() ) != null;
-        }
-
-        @Override
-        public void reportReplacedButNotUpdated( REPORT report )
-        {
-            report.propertyReplacedButNotUpdated();
-        }
-
-        @Override
-        public void checkReference( RECORD record, PropertyRecord property, REPORT report )
+        public void checkReference( RECORD record, PropertyRecord property, REPORT report, RecordAccess records )
         {
             if ( !property.inUse() )
             {
@@ -132,13 +132,17 @@ public abstract class PrimitiveRecordCheck
         {
             for ( RecordField<RECORD, REPORT> field : fields )
             {
-                if ( field.valueFrom( newRecord ) != field.valueFrom( oldRecord ) && !field.isNone( oldRecord ) )
-                {
-                    if ( !field.referencedRecordChanged( records, oldRecord ) )
-                    {
-                        field.reportReplacedButNotUpdated( report );
+                field.checkChange( oldRecord, newRecord, report, records );
+            // TODO: check
+            /*
+                if ( !newRecord.inUse() || field.valueFrom( newRecord ) != field.valueFrom( oldRecord ) )
+                { // old reference not referenced anymore
+                    if ( !field.isNone( oldRecord ) && !field.referencedRecordChanged( records, oldRecord ) )
+                    { // old reference was to something, and that something has not changed
+                        field.reportNotUpdated( report );
                     }
                 }
+            */
             }
         }
     }

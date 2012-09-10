@@ -40,6 +40,12 @@ public class DynamicRecordCheck
             {
                 return records.string( block );
             }
+
+            @Override
+            DynamicRecord changed( DiffRecordAccess records, long id )
+            {
+                return records.changedString( id );
+            }
         },
         ARRAY
         {
@@ -47,6 +53,12 @@ public class DynamicRecordCheck
             RecordReference<DynamicRecord> lookup( RecordAccess records, long block )
             {
                 return records.array( block );
+            }
+
+            @Override
+            DynamicRecord changed( DiffRecordAccess records, long id )
+            {
+                return records.changedArray( id );
             }
         },
         PROPERTY_KEY
@@ -56,6 +68,12 @@ public class DynamicRecordCheck
             {
                 return records.propertyKeyName( (int) block );
             }
+
+            @Override
+            DynamicRecord changed( DiffRecordAccess records, long id )
+            {
+                return null; // never needed
+            }
         },
         RELATIONSHIP_LABEL
         {
@@ -64,8 +82,17 @@ public class DynamicRecordCheck
             {
                 return records.relationshipLabelName( (int) block );
             }
+
+            @Override
+            DynamicRecord changed( DiffRecordAccess records, long id )
+            {
+                return null; // never needed
+            }
         };
+
         abstract RecordReference<DynamicRecord> lookup(RecordAccess records, long block);
+
+        abstract DynamicRecord changed( DiffRecordAccess records, long id );
     }
 
     private final int blockSize;
@@ -82,6 +109,19 @@ public class DynamicRecordCheck
                              ConsistencyReport.DynamicConsistencyReport report, DiffRecordAccess records )
     {
         check( newRecord, report, records );
+        if ( oldRecord.inUse() && !Record.NO_NEXT_BLOCK.is( oldRecord.getNextBlock() ) )
+        {
+            if ( !newRecord.inUse() || oldRecord.getNextBlock() != newRecord.getNextBlock() )
+            {
+                DynamicRecord next = dereference.changed( records, oldRecord.getNextBlock() );
+                if ( next == null )
+                {
+                    report.nextNotUpdated();
+                }
+                // TODO: how to check that the owner of 'next' is now a different property record.
+                // TODO: implement previous logic? DynamicRecord must change from used to unused or from unused to used
+            }
+        }
     }
 
     @Override
@@ -118,7 +158,7 @@ public class DynamicRecordCheck
 
     @Override
     public void checkReference( DynamicRecord record, DynamicRecord next,
-                                ConsistencyReport.DynamicConsistencyReport report )
+                                ConsistencyReport.DynamicConsistencyReport report, RecordAccess records )
     {
         if ( !next.inUse() )
         {

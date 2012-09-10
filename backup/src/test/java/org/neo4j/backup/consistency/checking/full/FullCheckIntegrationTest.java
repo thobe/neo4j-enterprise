@@ -21,6 +21,7 @@ package org.neo4j.backup.consistency.checking.full;
 
 import java.io.StringWriter;
 
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.neo4j.backup.consistency.RecordType;
@@ -33,6 +34,7 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.helpers.UTF8;
 import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
+import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
@@ -102,6 +104,32 @@ public class FullCheckIntegrationTest
 
         // then
         assertEquals( 0, result.getTotalInconsistencyCount() );
+    }
+
+    @Test
+    @Ignore("Support for checking NeoStore needs to be added")
+    public void shouldReportNeoStoreInconsistencies() throws Exception
+    {
+        // given
+        fixture.apply( new GraphStoreFixture.Transaction()
+        {
+            @Override
+            protected void transactionData( GraphStoreFixture.TransactionDataBuilder tx,
+                                            GraphStoreFixture.IdGenerator next )
+            {
+                NeoStoreRecord record = new NeoStoreRecord();
+                record.setNextProp( next.property() );
+                tx.update( record );
+                // We get exceptions when only the above happens...
+                tx.create( new NodeRecord( next.node(), -1, -1 ) );
+            }
+        } );
+
+        // when
+        ConsistencySummaryStatistics stats = check();
+
+        // then
+        verifyInconsistency( RecordType.NEO_STORE, stats );
     }
 
     @Test

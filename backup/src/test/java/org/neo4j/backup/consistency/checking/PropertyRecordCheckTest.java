@@ -22,10 +22,13 @@ package org.neo4j.backup.consistency.checking;
 import org.junit.Test;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
+import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
+import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyType;
+import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 
 import static org.mockito.Mockito.verify;
 
@@ -92,7 +95,7 @@ public class PropertyRecordCheckTest
         ConsistencyReport.PropertyConsistencyReport report = check( property );
 
         // then
-        verify( report ).previousNotInUse( prev );
+        verify( report ).prevNotInUse( prev );
         verifyOnlyReferenceDispatch( report );
     }
 
@@ -227,9 +230,12 @@ public class PropertyRecordCheckTest
         PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
         newProperty.setPrevProp( 11 );
         newProperty.setNextProp( 12 );
+        newProperty.setNodeId( addChange( inUse( new NodeRecord( 100, NONE, 1 ) ),
+                                          inUse( new NodeRecord( 100, NONE, 11 ) ) ).getId() );
 
-        addChange( inUse( new PropertyRecord( 1 ) ),
-                   notInUse( new PropertyRecord( 1 ) ) );
+        PropertyRecord oldPrev = inUse( new PropertyRecord( 1 ) );
+        addChange( oldPrev, notInUse( new PropertyRecord( 1 ) ) );
+        oldPrev.setNextProp( 42 );
         addChange( inUse( new PropertyRecord( 2 ) ),
                    notInUse( new PropertyRecord( 2 ) ) );
 
@@ -237,6 +243,118 @@ public class PropertyRecordCheckTest
                    inUse( new PropertyRecord( 11 ) ) ).setNextProp( 42 );
         addChange( notInUse( new PropertyRecord( 12 ) ),
                    inUse( new PropertyRecord( 12 ) ) ).setPrevProp( 42 );
+
+        // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportProblemsWithTheNewStateWhenCheckingChanges() throws Exception
+    {
+        // given
+        PropertyRecord oldProperty = notInUse( new PropertyRecord( 42 ) );
+        PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
+        newProperty.setNodeId( add( notInUse( new NodeRecord( 10, 0, 0 ) ) ).getId() );
+        newProperty.setPrevProp( 1 );
+        newProperty.setNextProp( 2 );
+        PropertyRecord prev = add( notInUse( new PropertyRecord( 1 ) ) );
+        PropertyRecord next = add( notInUse( new PropertyRecord( 2 ) ) );
+
+        // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
+
+        // then
+        verify( report ).prevNotInUse( prev );
+        verify( report ).nextNotInUse( next );
+        verify( report ).ownerDoesNotReferenceBack();
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldNotReportAnythingWhenAddingAnInitialNextProperty() throws Exception
+    {
+        // given
+        PropertyRecord oldProperty = inUse( new PropertyRecord( 42 ) );
+        PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
+        PropertyRecord nextProperty = addChange( notInUse( new PropertyRecord( 1 ) ),
+                                                 inUse( new PropertyRecord( 1 ) ) );
+        nextProperty.setPrevProp( 42 );
+        newProperty.setNextProp( nextProperty.getId() );
+
+        newProperty.setNodeId( add( inUse( new NodeRecord( 100, NONE, newProperty.getId() ) ) ).getId() );
+
+        // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldNotReportAnythingWhenAddingAnInitialPrevProperty() throws Exception
+    {
+        // given
+        PropertyRecord oldProperty = inUse( new PropertyRecord( 42 ) );
+        PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
+        PropertyRecord prevProperty = addChange( notInUse( new PropertyRecord( 1 ) ),
+                                                 inUse( new PropertyRecord( 1 ) ) );
+        prevProperty.setNextProp( 42 );
+        newProperty.setPrevProp( prevProperty.getId() );
+
+        newProperty.setNodeId( addChange( inUse( new NodeRecord( 100, NONE, oldProperty.getId() ) ),
+                                          inUse( new NodeRecord( 100, NONE, prevProperty.getId() ) ) ).getId() );
+
+        // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldNotReportAnythingWhenChangingNextProperty() throws Exception
+    {
+        // given
+        PropertyRecord oldProperty = inUse( new PropertyRecord( 42 ) );
+        PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
+        PropertyRecord oldNext = inUse( new PropertyRecord( 1 ) );
+        addChange( oldNext, inUse( new PropertyRecord( 1 ) ) );
+        PropertyRecord newNext = addChange( notInUse( new PropertyRecord( 2 ) ),
+                                            inUse( new PropertyRecord( 2 ) ));
+        oldProperty.setNextProp( oldNext.getId() );
+        oldNext.setPrevProp( 42 );
+        newProperty.setNextProp( newNext.getId() );
+        newNext.setPrevProp( newProperty.getId() );
+
+        newProperty.setNodeId( add( inUse( new NodeRecord( 100, NONE, newProperty.getId() ) ) ).getId() );
+
+        // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldNotReportAnythingWhenChangingPrevProperty() throws Exception
+    {
+        // given
+        PropertyRecord oldProperty = inUse( new PropertyRecord( 42 ) );
+        PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
+        PropertyRecord oldPrev = inUse( new PropertyRecord( 1 ) );
+        addChange( oldPrev, inUse( new PropertyRecord( 1 ) ) );
+        PropertyRecord newPrev = addChange( notInUse( new PropertyRecord( 2 ) ),
+                                            inUse( new PropertyRecord( 2 ) ));
+        oldProperty.setPrevProp( oldPrev.getId() );
+        oldPrev.setNextProp( 42 );
+        newProperty.setPrevProp( newPrev.getId() );
+        newPrev.setNextProp( newProperty.getId() );
+
+        newProperty.setNodeId( addChange( inUse( new NodeRecord( 100, NONE, oldPrev.getId() ) ),
+                                          inUse( new NodeRecord( 100, NONE, newPrev.getId() ) ) ).getId() );
 
         // when
         ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
@@ -254,14 +372,17 @@ public class PropertyRecordCheckTest
         PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
         newProperty.setPrevProp( 2 );
 
+        add( inUse( new PropertyRecord( 1 ) ) ).setNextProp( 42 );
         addChange( notInUse( new PropertyRecord( 2 ) ),
                    inUse( new PropertyRecord( 2 ) ) ).setNextProp( 42 );
+
+        newProperty.setNodeId( add( inUse( new NodeRecord( 100, NONE, 1 ) ) ).getId() );
 
         // when
         ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
 
         // then
-        verify( report ).previousReplacedButNotUpdated();
+        verify( report ).prevNotUpdated();
         verifyOnlyReferenceDispatch( report );
     }
 
@@ -276,11 +397,13 @@ public class PropertyRecordCheckTest
         addChange( notInUse( new PropertyRecord( 2 ) ),
                    inUse( new PropertyRecord( 2 ) ) ).setPrevProp( 42 );
 
+        newProperty.setNodeId( add( inUse( new NodeRecord( 100, NONE, newProperty.getId() ) ) ).getId() );
+
         // when
         ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
 
         // then
-        verify( report ).nextReplacedButNotUpdated();
+        verify( report ).nextNotUpdated();
         verifyOnlyReferenceDispatch( report );
     }
 
@@ -293,6 +416,8 @@ public class PropertyRecordCheckTest
                                              add( string( inUse( new DynamicRecord( 100 ) ) ) ) );
         oldProperty.addPropertyBlock( block );
         PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
+
+        newProperty.setNodeId( add( inUse( new NodeRecord( 100, NONE, newProperty.getId() ) ) ).getId() );
 
         // when
         ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
@@ -312,11 +437,235 @@ public class PropertyRecordCheckTest
         oldProperty.addPropertyBlock( block );
         PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
 
+        newProperty.setNodeId( add( inUse( new NodeRecord( 100, NONE, newProperty.getId() ) ) ).getId() );
+
         // when
         ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
 
         // then
         verify( report ).arrayUnreferencedButNotDeleted( block );
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportPropertyChangedForWrongNode() throws Exception
+    {
+        // given
+        PropertyRecord oldProperty = inUse( new PropertyRecord( 42 ) );
+        PropertyRecord newProperty = notInUse( new PropertyRecord( 42 ) );
+        newProperty.setNodeId( 10 );
+        add( inUse( new NodeRecord( 10, NONE, NONE ) ) );
+
+        // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
+
+        // then
+        verify( report ).changedForWrongOwner();
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportPropertyChangedForWrongNodeWithChain() throws Exception
+    {
+        // given
+        PropertyRecord oldProperty = inUse( new PropertyRecord( 42 ) );
+        PropertyRecord newProperty = notInUse( new PropertyRecord( 42 ) );
+        PropertyRecord a = add( inUse( new PropertyRecord( 1 ) ) );
+        PropertyRecord b = add( inUse( new PropertyRecord( 2 ) ) );
+        a.setNextProp( b.getId() );
+        b.setPrevProp( a.getId() );
+        newProperty.setNodeId( add( inUse( new NodeRecord( 10, NONE, a.getId() ) ) ).getId() );
+
+        // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
+
+        // then
+        verify( report ).changedForWrongOwner();
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportPropertyChangedForWrongRelationship() throws Exception
+    {
+        // given
+        PropertyRecord oldProperty = inUse( new PropertyRecord( 42 ) );
+        PropertyRecord newProperty = notInUse( new PropertyRecord( 42 ) );
+        newProperty.setRelId( 10 );
+        add( inUse( new RelationshipRecord( 10, 100, 200, 0 ) ) );
+
+        // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
+
+        // then
+        verify( report ).changedForWrongOwner();
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportPropertyChangedForWrongRelationshipWithChain() throws Exception
+    {
+        // given
+        PropertyRecord oldProperty = inUse( new PropertyRecord( 42 ) );
+        PropertyRecord newProperty = notInUse( new PropertyRecord( 42 ) );
+        RelationshipRecord rel = add( inUse( new RelationshipRecord( 1, 10, 20, 0 ) ) );
+        PropertyRecord a = add( inUse( new PropertyRecord( 1 ) ) );
+        PropertyRecord b = add( inUse( new PropertyRecord( 2 ) ) );
+        a.setNextProp( b.getId() );
+        b.setPrevProp( a.getId() );
+        rel.setNextProp( a.getId() );
+        newProperty.setRelId( rel.getId() );
+
+        // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
+
+        // then
+        verify( report ).changedForWrongOwner();
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportPropertyChangedForWrongNeoStore() throws Exception
+    {
+        // given
+        PropertyRecord oldProperty = inUse( new PropertyRecord( 42 ) );
+        PropertyRecord newProperty = notInUse( new PropertyRecord( 42 ) );
+        add( inUse( new NeoStoreRecord() ) );
+
+        // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
+
+        // then
+        verify( report ).changedForWrongOwner();
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportPropertyChangedForWrongNeoStoreWithChain() throws Exception
+    {
+        // given
+        PropertyRecord oldProperty = inUse( new PropertyRecord( 42 ) );
+        PropertyRecord newProperty = notInUse( new PropertyRecord( 42 ) );
+        PropertyRecord a = add( inUse( new PropertyRecord( 1 ) ) );
+        PropertyRecord b = add( inUse( new PropertyRecord( 2 ) ) );
+        a.setNextProp( b.getId() );
+        b.setPrevProp( a.getId() );
+        add( inUse( new NeoStoreRecord() ) ).setNextProp( a.getId() );
+
+        // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
+
+        // then
+        verify( report ).changedForWrongOwner();
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportPropertyNotReferencedFromNode() throws Exception
+    {
+        // given
+        PropertyRecord oldProperty = notInUse( new PropertyRecord( 42 ) );
+        PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
+        newProperty.setNodeId( add( inUse( new NodeRecord( 1, NONE, NONE ) ) ).getId() );
+
+        // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
+
+        // then
+        verify( report ).ownerDoesNotReferenceBack();
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportPropertyNotReferencedFromNodeWithChain() throws Exception
+    {
+        // given
+        PropertyRecord oldProperty = notInUse( new PropertyRecord( 42 ) );
+        PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
+        PropertyRecord a = add( inUse( new PropertyRecord( 1 ) ) );
+        PropertyRecord b = add( inUse( new PropertyRecord( 2 ) ) );
+        a.setNextProp( b.getId() );
+        b.setPrevProp( a.getId() );
+        newProperty.setNodeId( add( inUse( new NodeRecord( 1, NONE, a.getId() ) ) ).getId() );
+
+        // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
+
+        // then
+        verify( report ).ownerDoesNotReferenceBack();
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportPropertyNotReferencedFromRelationship() throws Exception
+    {
+        // given
+        PropertyRecord oldProperty = notInUse( new PropertyRecord( 42 ) );
+        PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
+        newProperty.setRelId( add( inUse( new RelationshipRecord( 1, 10, 20, 0 ) ) ).getId() );
+
+        // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
+
+        // then
+        verify( report ).ownerDoesNotReferenceBack();
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportPropertyNotReferencedFromRelationshipWithChain() throws Exception
+    {
+        // given
+        PropertyRecord oldProperty = notInUse( new PropertyRecord( 42 ) );
+        PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
+        RelationshipRecord rel = add( inUse( new RelationshipRecord( 1, 10, 20, 0 ) ) );
+        PropertyRecord a = add( inUse( new PropertyRecord( 1 ) ) );
+        PropertyRecord b = add( inUse( new PropertyRecord( 2 ) ) );
+        a.setNextProp( b.getId() );
+        b.setPrevProp( a.getId() );
+        rel.setNextProp( a.getId() );
+        newProperty.setRelId( rel.getId() );
+
+        // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
+
+        // then
+        verify( report ).ownerDoesNotReferenceBack();
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportPropertyNotReferencedFromNeoStore() throws Exception
+    {
+        // given
+        PropertyRecord oldProperty = notInUse( new PropertyRecord( 42 ) );
+        PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
+        add( inUse( new NeoStoreRecord() ) );
+
+        // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
+
+        // then
+        verify( report ).ownerDoesNotReferenceBack();
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportPropertyNotReferencedFromNeoStoreWithChain() throws Exception
+    {
+        // given
+        PropertyRecord oldProperty = notInUse( new PropertyRecord( 42 ) );
+        PropertyRecord newProperty = inUse( new PropertyRecord( 42 ) );
+        PropertyRecord a = add( inUse( new PropertyRecord( 1 ) ) );
+        PropertyRecord b = add( inUse( new PropertyRecord( 2 ) ) );
+        a.setNextProp( b.getId() );
+        b.setPrevProp( a.getId() );
+        add( inUse( new NeoStoreRecord() ) ).setNextProp( a.getId() );
+
+        // when
+        ConsistencyReport.PropertyConsistencyReport report = checkChange( oldProperty, newProperty );
+
+        // then
+        verify( report ).ownerDoesNotReferenceBack();
         verifyOnlyReferenceDispatch( report );
     }
 }

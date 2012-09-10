@@ -20,6 +20,7 @@
 package org.neo4j.backup.consistency.store;
 
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
+import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
@@ -45,4 +46,6 @@ public interface RecordAccess
     RecordReference<DynamicRecord> relationshipLabelName( final int id );
 
     RecordReference<DynamicRecord> propertyKeyName( final int id );
+
+    RecordReference<NeoStoreRecord> graph();
 }

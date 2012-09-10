@@ -30,9 +30,5 @@ interface RecordField<RECORD extends AbstractBaseRecord, REPORT extends Consiste
 
     long valueFrom( RECORD record );
 
-    boolean isNone( RECORD record );
-
-    boolean referencedRecordChanged( DiffRecordAccess records, RECORD record );
-
-    void reportReplacedButNotUpdated( REPORT report );
+    void checkChange( RECORD oldRecord, RECORD newRecord, REPORT report, DiffRecordAccess records );
 }
