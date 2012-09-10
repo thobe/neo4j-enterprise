@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
 import org.neo4j.backup.consistency.report.ConsistencyReporter;
 import org.neo4j.backup.consistency.report.ConsistencySummaryStatistics;
+import org.neo4j.backup.consistency.report.MessageConsistencyLogger;
 import org.neo4j.backup.consistency.store.DirectRecordAccess;
 import org.neo4j.graphdb.factory.GraphDatabaseSetting;
 import org.neo4j.helpers.progress.Completion;
@@ -74,7 +75,7 @@ public class FullCheck
 
     public void execute( StoreAccess store, StringLogger logger ) throws ConsistencyCheckIncompleteException
     {
-        ConsistencyReporter reporter = new ConsistencyReporter( logger,
+        ConsistencyReporter reporter = new ConsistencyReporter( new MessageConsistencyLogger( logger ),
                                                                 new DirectRecordAccess( store ) );
         execute( store, reporter );
         ConsistencySummaryStatistics summary = reporter.getSummary();

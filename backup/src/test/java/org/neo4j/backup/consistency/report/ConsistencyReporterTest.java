@@ -54,10 +54,9 @@ import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
-import org.neo4j.kernel.impl.util.StringLogger;
 
-import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.argThat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -77,13 +76,13 @@ public class ConsistencyReporterTest
             // given
             ConsistencySummaryStatistics summary = mock( ConsistencySummaryStatistics.class );
             ConsistencyReporter.ReportHandler handler = new ConsistencyReporter.ReportHandler(
-                    StringLogger.DEV_NULL, summary, RecordType.PROPERTY, new PropertyRecord( 0 ) );
+                    mock( ConsistencyLogger.class ), summary, RecordType.PROPERTY, new PropertyRecord( 0 ) );
 
             // when
             handler.updateSummary();
 
             // then
-            verify( summary ).add( RecordType.PROPERTY, 0, 0 );
+            verify( summary ).update( RecordType.PROPERTY, 0, 0 );
             verifyNoMoreInteractions( summary );
         }
 
@@ -93,7 +92,7 @@ public class ConsistencyReporterTest
             // given
             ConsistencySummaryStatistics summary = mock( ConsistencySummaryStatistics.class );
             ConsistencyReporter.ReportHandler handler = new ConsistencyReporter.ReportHandler(
-                    StringLogger.DEV_NULL, summary, RecordType.PROPERTY, new PropertyRecord( 0 ) );
+                    mock( ConsistencyLogger.class ), summary, RecordType.PROPERTY, new PropertyRecord( 0 ) );
 
             ConsistencyReport.PropertyConsistencyReport report =
                     (ConsistencyReport.PropertyConsistencyReport) Proxy
@@ -123,7 +122,7 @@ public class ConsistencyReporterTest
             pendingRefCheck.skip();
 
             // then
-            verify( summary ).add( RecordType.PROPERTY, 0, 0 );
+            verify( summary ).update( RecordType.PROPERTY, 0, 0 );
             verifyNoMoreInteractions( summary );
         }
     }
@@ -131,14 +130,12 @@ public class ConsistencyReporterTest
     @RunWith(Parameterized.class)
     public static class TestAllReportMessages implements Answer
     {
-        private static final boolean LOG_MESSAGE_SAMPLES = false;
-
         @Test
+        @SuppressWarnings("unchecked")
         public void shouldLogInconsistency() throws Exception
         {
             // given
-            StringBuffer result = new StringBuffer();
-            StringLogger logger = StringLogger.wrap( result );
+            ConsistencyLogger logger = mock( ConsistencyLogger.class );
             ConsistencyReport.Reporter reporter = new ConsistencyReporter(
                     logger, mock( DiffRecordAccess.class ) );
 
@@ -146,15 +143,34 @@ public class ConsistencyReporterTest
             reportMethod.invoke( reporter, parameters( reportMethod ) );
 
             // then
-            String message = result.toString();
-            assertThat( message, containsMessage( this.toString() ) );
-
-            if ( LOG_MESSAGE_SAMPLES )
+            if ( method.getAnnotation( ConsistencyReport.Warning.class ) == null )
             {
-                System.out.println( this + ":" );
-                for ( String line : message.split( "\n" ) )
+                if ( reportMethod.getName().endsWith( "Change" ) )
                 {
-                    System.out.println( "\t" + line );
+                    verify( logger ).error( any( RecordType.class ),
+                                            any( AbstractBaseRecord.class ), any( AbstractBaseRecord.class ),
+                                            argThat( hasExpectedFormat() ), any( Object[].class ) );
+                }
+                else
+                {
+                    verify( logger ).error( any( RecordType.class ),
+                                            any( AbstractBaseRecord.class ),
+                                            argThat( hasExpectedFormat() ), any( Object[].class ) );
+                }
+            }
+            else
+            {
+                if ( reportMethod.getName().endsWith( "Change" ) )
+                {
+                    verify( logger ).warning( any( RecordType.class ),
+                                              any( AbstractBaseRecord.class ), any( AbstractBaseRecord.class ),
+                                              argThat( hasExpectedFormat() ), any( Object[].class ) );
+                }
+                else
+                {
+                    verify( logger ).warning( any( RecordType.class ),
+                                              any( AbstractBaseRecord.class ),
+                                              argThat( hasExpectedFormat() ), any( Object[].class ) );
                 }
             }
         }
@@ -310,21 +326,20 @@ public class ConsistencyReporterTest
         }
     }
 
-    private static Matcher<String> containsMessage( final String descr )
+    private static Matcher<String> hasExpectedFormat()
     {
         return new TypeSafeMatcher<String>()
         {
             @Override
             public boolean matchesSafely( String item )
             {
-                item = item.split( "\n" )[0];
-                return item.split( "(ERROR|WARNING): " )[1].contains( " " );
+                return item.trim().split( " " ).length > 0;
             }
 
             @Override
             public void describeTo( Description description )
             {
-                description.appendText( "String containing a message for " ).appendText( descr );
+                description.appendText( "message of valid format" );
             }
         };
     }

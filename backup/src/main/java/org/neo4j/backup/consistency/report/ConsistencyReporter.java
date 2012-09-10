@@ -39,7 +39,6 @@ import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
-import org.neo4j.kernel.impl.util.StringLogger;
 
 import static java.lang.reflect.Proxy.getInvocationHandler;
 import static org.neo4j.helpers.Exceptions.launderedException;
@@ -77,11 +76,11 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
     private static final ProxyFactory<ConsistencyReport.DynamicConsistencyReport> DYNAMIC_REPORT =
             ProxyFactory.create( ConsistencyReport.DynamicConsistencyReport.class );
 
-    private final StringLogger logger;
+    private final ConsistencyLogger logger;
     private final DiffRecordAccess records;
     private final ConsistencySummaryStatistics summary = new ConsistencySummaryStatistics();
 
-    public ConsistencyReporter( StringLogger logger, DiffRecordAccess records )
+    public ConsistencyReporter( ConsistencyLogger logger, DiffRecordAccess records )
     {
         this.logger = logger;
         this.records = records;
@@ -133,15 +132,13 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
 
     private static abstract class ReportInvocationHandler implements InvocationHandler
     {
-        private final StringLogger logger;
-        private final ConsistencySummaryStatistics summary;
-        private final RecordType type;
+        final ReportSink sink;
+        final RecordType type;
         private short errors = 0, warnings = 0, references = 1/*this*/;
 
-        private ReportInvocationHandler( StringLogger logger, ConsistencySummaryStatistics summary, RecordType type )
+        private ReportInvocationHandler( ConsistencyLogger logger, ConsistencySummaryStatistics stats, RecordType type )
         {
-            this.logger = logger;
-            this.summary = summary;
+            this.sink = new ReportSink( logger, stats );
             this.type = type;
         }
 
@@ -149,7 +146,7 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
         {
             if ( --references == 0 )
             {
-                summary.add( type, errors, warnings );
+                sink.updateSummary( type, errors, warnings );
             }
         }
 
@@ -169,39 +166,33 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
             }
             else
             {
-                StringBuilder message = new StringBuilder();
+                String message;
+                Documented annotation = method.getAnnotation( Documented.class );
+                if ( annotation != null && !"".equals( annotation.value() ) )
+                {
+                   message = annotation.value();
+                }
+                else
+                {
+                    message = method.getName();
+                }
                 if ( method.getAnnotation( ConsistencyReport.Warning.class ) == null )
                 {
                     errors++;
-                    message.append( "ERROR: " );
+                    logError( message, args );
                 }
                 else
                 {
                     warnings++;
-                    message.append( "WARNING: " );
+                    logWarning( message, args );
                 }
-                Documented annotation = method.getAnnotation( Documented.class );
-                if ( annotation != null && !"".equals( annotation.value() ) )
-                {
-                    message.append( annotation.value() );
-                }
-                else
-                {
-                    message.append( method.getName() );
-                }
-                emitRecord( message );
-                if ( args != null )
-                {
-                    message.append( "\n\tInconsistent with: " );
-                    for ( Object arg : args )
-                    {
-                        message.append( arg ).append( ' ' );
-                    }
-                }
-                logger.logMessage( message.toString() );
             }
             return null;
         }
+
+        protected abstract void logError( String message, Object[] args );
+
+        protected abstract void logWarning( String message, Object[] args );
 
         @SuppressWarnings("unchecked")
         private void dispatchForReference( ConsistencyReport report, RecordReference reference,
@@ -218,8 +209,6 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
             reference.dispatch( new PendingReferenceCheck<REFERENCED>( report, checker ) );
         }
 
-        abstract void emitRecord( StringBuilder message );
-
         abstract void checkReference( ConsistencyReport report, ComparativeRecordChecker checker,
                                       AbstractBaseRecord referenced, RecordAccess records );
 
@@ -232,7 +221,7 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
     {
         private final AbstractBaseRecord record;
 
-        ReportHandler( StringLogger logger, ConsistencySummaryStatistics summary, RecordType type,
+        ReportHandler( ConsistencyLogger logger, ConsistencySummaryStatistics summary, RecordType type,
                        AbstractBaseRecord record )
         {
             super( logger, summary, type );
@@ -240,9 +229,15 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
         }
 
         @Override
-        void emitRecord( StringBuilder message )
+        protected void logError( String message, Object[] args )
         {
-            message.append( "\n\t" ).append( record );
+            sink.error( type, record, message, args );
+        }
+
+        @Override
+        protected void logWarning( String message, Object[] args )
+        {
+            sink.warning( type, record, message, args );
         }
 
         @Override
@@ -268,8 +263,8 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
         private final AbstractBaseRecord oldRecord;
         private final AbstractBaseRecord newRecord;
 
-        private DiffReportHandler( StringLogger logger, ConsistencySummaryStatistics summary,
-                                   RecordType type, AbstractBaseRecord oldRecord, AbstractBaseRecord newRecord )
+        private DiffReportHandler( ConsistencyLogger logger, ConsistencySummaryStatistics summary, RecordType type,
+                                   AbstractBaseRecord oldRecord, AbstractBaseRecord newRecord )
         {
             super( logger, summary, type );
             this.oldRecord = oldRecord;
@@ -277,10 +272,15 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
         }
 
         @Override
-        void emitRecord( StringBuilder message )
+        protected void logError( String message, Object[] args )
         {
-            message.append( "\n\t- " ).append( oldRecord );
-            message.append( "\n\t+ " ).append( newRecord );
+            sink.error( type, oldRecord, newRecord, message, args );
+        }
+
+        @Override
+        protected void logWarning( String message, Object[] args )
+        {
+            sink.warning( type, oldRecord, newRecord, message, args );
         }
 
         @Override

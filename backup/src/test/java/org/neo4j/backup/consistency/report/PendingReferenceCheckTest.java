@@ -6,7 +6,6 @@ import org.junit.Test;
 import org.neo4j.backup.consistency.RecordType;
 import org.neo4j.backup.consistency.checking.ComparativeRecordChecker;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.util.StringLogger;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -18,7 +17,7 @@ public class PendingReferenceCheckTest
     {
         ConsistencyReporter.ReportHandler handler =
                 new ConsistencyReporter.ReportHandler(
-                        StringLogger.DEV_NULL,
+                        mock( ConsistencyLogger.class ),
                         mock( ConsistencySummaryStatistics.class ),
                         RecordType.PROPERTY,
                         new PropertyRecord( 0 ) );

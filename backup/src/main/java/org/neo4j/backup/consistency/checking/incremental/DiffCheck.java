@@ -24,6 +24,7 @@ import org.neo4j.backup.consistency.checking.full.ConsistencyCheckIncompleteExce
 import org.neo4j.backup.consistency.report.ConsistencyReport;
 import org.neo4j.backup.consistency.report.ConsistencyReporter;
 import org.neo4j.backup.consistency.report.ConsistencySummaryStatistics;
+import org.neo4j.backup.consistency.report.MessageConsistencyLogger;
 import org.neo4j.backup.consistency.store.DiffStore;
 import org.neo4j.backup.consistency.store.DirectRecordAccess;
 import org.neo4j.kernel.impl.util.StringLogger;
@@ -39,7 +40,7 @@ public abstract class DiffCheck
 
     public final void check( DiffStore diffs ) throws InconsistentStoreException, ConsistencyCheckIncompleteException
     {
-        ConsistencyReporter reporter = new ConsistencyReporter( logger,
+        ConsistencyReporter reporter = new ConsistencyReporter( new MessageConsistencyLogger( logger ),
                                                                 new DirectRecordAccess( diffs ) );
         try
         {
