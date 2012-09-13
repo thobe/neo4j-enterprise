@@ -117,7 +117,7 @@ public class ConsistencyPerformanceCheck
      *    -report_progress
      *    -node_count 10000000
      *    -relationships FOO:2,BAR:1
-     *    -node_properties SINGLE_STRING,SINGLE_STRING,SINGLE_STRING,SINGLE_STRING,SINGLE_STRING
+     *    -node_properties INTEGER:2,STRING:1,BYTE_ARRAY:1
      */
     public static void main( String... args ) throws Exception
     {
