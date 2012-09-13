@@ -45,6 +45,8 @@ import org.neo4j.perftest.enterprise.util.Configuration;
 import org.neo4j.perftest.enterprise.util.Parameters;
 import org.neo4j.perftest.enterprise.util.Setting;
 
+import static org.neo4j.backup.consistency.checking.full.FullCheck.consistency_check_single_threaded;
+import static org.neo4j.backup.consistency.checking.full.FullCheck.use_scan_resistant_window_pools;
 import static org.neo4j.helpers.collection.MapUtil.stringMap;
 import static org.neo4j.perftest.enterprise.util.Configuration.SYSTEM_PROPERTIES;
 import static org.neo4j.perftest.enterprise.util.Configuration.settingsOf;
@@ -96,11 +98,22 @@ public class ConsistencyPerformanceCheck
             void run( ProgressMonitorFactory progress, String storeDir, boolean singleThreaded ) throws ConsistencyCheckIncompleteException
             {
                 FullCheck.run( progress, storeDir,
-                               new Config( new ConfigurationDefaults( GraphDatabaseSettings.class )
-                                                   .apply( stringMap(
-                                                           FullCheck.consistency_check_single_threaded.name(),
-                                                           Boolean.toString( singleThreaded ) ) ) ),
-                               StringLogger.DEV_NULL );
+                        new Config( new ConfigurationDefaults( GraphDatabaseSettings.class ).apply( stringMap(
+                                consistency_check_single_threaded.name(), Boolean.toString( singleThreaded ) ) ) ),
+                        StringLogger.DEV_NULL );
+            }
+        },
+        NEWER
+        {
+            @Override
+            void run( ProgressMonitorFactory progress, String storeDir, boolean singleThreaded ) throws ConsistencyCheckIncompleteException
+            {
+                FullCheck.run( progress, storeDir,
+                        new Config( new ConfigurationDefaults( GraphDatabaseSettings.class ).apply( stringMap(
+                                GraphDatabaseSettings.all_stores_total_mapped_memory_size.name(), "2G",
+                                use_scan_resistant_window_pools.name(), "true",
+                                consistency_check_single_threaded.name(), "true" ) ) ),
+                        StringLogger.DEV_NULL );
             }
         };
 
@@ -150,9 +163,10 @@ public class ConsistencyPerformanceCheck
             System.out.println( "Press return to start the checker..." );
             System.in.read();
         }
-        configuration.get( checker_version ).run( new TimingProgress( new JsonReportWriter( configuration ), progress ),
-                                                  configuration.get( DataGenerator.store_dir ),
-                                                  configuration.get( single_threaded ) );
+        configuration.get( checker_version ).run( new TimingProgress( new TimeLogger( new JsonReportWriter(
+                configuration ) ), progress ),
+                configuration.get( DataGenerator.store_dir ),
+                configuration.get( single_threaded ) );
     }
 
     private static class JsonReportWriter implements TimingProgress.Visitor
@@ -235,11 +249,6 @@ public class ConsistencyPerformanceCheck
             json.close();
         }
 
-        private static double nanosToMillis( long nanoTime )
-        {
-            return nanoTime / 1000000.0;
-        }
-
         private void ensureOpen( boolean open ) throws IOException
         {
             if ( (json == null) == open )
@@ -247,6 +256,41 @@ public class ConsistencyPerformanceCheck
                 throw new IOException(
                         new IllegalStateException( String.format( "Writing %s started.", open ? "not" : "already" ) ) );
             }
+        }
+    }
+
+    private static double nanosToMillis( long nanoTime )
+    {
+        return nanoTime / 1000000.0;
+    }
+
+    private static class TimeLogger implements TimingProgress.Visitor
+    {
+        private final TimingProgress.Visitor next;
+
+        public TimeLogger( TimingProgress.Visitor next )
+        {
+            this.next = next;
+        }
+
+        @Override
+        public void beginTimingProgress( long totalElementCount, long totalTimeNanos ) throws IOException
+        {
+            System.out.printf( "Processed %d elements in %.3f ms%n",
+                    totalElementCount, nanosToMillis( totalTimeNanos ) );
+            next.beginTimingProgress( totalElementCount, totalTimeNanos );
+        }
+
+        @Override
+        public void phaseTimingProgress( String phase, long elementCount, long timeNanos ) throws IOException
+        {
+            next.phaseTimingProgress( phase, elementCount, timeNanos );
+        }
+
+        @Override
+        public void endTimingProgress() throws IOException
+        {
+            next.endTimingProgress();
         }
     }
 }

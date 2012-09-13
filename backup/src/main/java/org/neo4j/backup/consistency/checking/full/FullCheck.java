@@ -41,6 +41,7 @@ import org.neo4j.kernel.DefaultLastCommittedTxIdSetter;
 import org.neo4j.kernel.DefaultTxHook;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
+import org.neo4j.kernel.impl.nioneo.store.DefaultWindowPoolFactory;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
@@ -51,6 +52,8 @@ import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
 import org.neo4j.kernel.impl.nioneo.store.StoreAccess;
 import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
+import org.neo4j.kernel.impl.nioneo.store.windowpool.ScanResistantWindowPoolFactory;
+import org.neo4j.kernel.impl.nioneo.store.windowpool.WindowPoolFactory;
 import org.neo4j.kernel.impl.util.StringLogger;
 
 public class FullCheck
@@ -61,6 +64,9 @@ public class FullCheck
     /** Defaults to false due to the way Boolean.parseBoolean(null) works. */
     public static final GraphDatabaseSetting<Boolean> consistency_check_single_threaded =
             new GraphDatabaseSetting.BooleanSetting( "consistency_check_single_threaded" );
+    /** Defaults to false due to the way Boolean.parseBoolean(null) works. */
+    public static final GraphDatabaseSetting<Boolean> use_scan_resistant_window_pools =
+            new GraphDatabaseSetting.BooleanSetting( "use_scan_resistant_window_pools" );
 
     private final boolean checkPropertyOwners;
     private final TaskExecution execution;
@@ -175,12 +181,14 @@ public class FullCheck
     public static void run( ProgressMonitorFactory progressFactory, String storeDir, Config config,
                             StringLogger logger ) throws ConsistencyCheckIncompleteException
     {
-        StoreFactory factory = new StoreFactory( config,
-                                                 new DefaultIdGeneratorFactory(),
-                                                 new DefaultFileSystemAbstraction(),
-                                                 new DefaultLastCommittedTxIdSetter(),
-                                                 logger,
-                                                 new DefaultTxHook() );
+        StoreFactory factory = new StoreFactory(
+                config,
+                new DefaultIdGeneratorFactory(),
+                windowPoolFactory( config ),
+                new DefaultFileSystemAbstraction(),
+                new DefaultLastCommittedTxIdSetter(),
+                logger,
+                new DefaultTxHook() );
         NeoStore neoStore = factory.newNeoStore( new File( storeDir, NeoStore.DEFAULT_NAME ).getAbsolutePath() );
         try
         {
@@ -192,6 +200,18 @@ public class FullCheck
         finally
         {
             neoStore.close();
+        }
+    }
+
+    private static WindowPoolFactory windowPoolFactory( Config config )
+    {
+        if ( config.get( use_scan_resistant_window_pools ) )
+        {
+            return new ScanResistantWindowPoolFactory( config );
+        }
+        else
+        {
+            return new DefaultWindowPoolFactory();
         }
     }
 
