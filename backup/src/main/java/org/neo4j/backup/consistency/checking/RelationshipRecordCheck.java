@@ -26,10 +26,10 @@ import org.neo4j.kernel.impl.nioneo.store.Record;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
 
-public class RelationshipRecordCheck
+class RelationshipRecordCheck
         extends PrimitiveRecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport>
 {
-    public RelationshipRecordCheck()
+    RelationshipRecordCheck()
     {
         super( Label.LABEL,
                RelationshipNodeField.SOURCE, RelationshipField.SOURCE_PREV, RelationshipField.SOURCE_NEXT,

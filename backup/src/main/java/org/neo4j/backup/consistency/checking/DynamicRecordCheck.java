@@ -22,83 +22,18 @@ package org.neo4j.backup.consistency.checking;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
 import org.neo4j.backup.consistency.store.DiffRecordAccess;
 import org.neo4j.backup.consistency.store.RecordAccess;
-import org.neo4j.backup.consistency.store.RecordReference;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.Record;
 import org.neo4j.kernel.impl.nioneo.store.RecordStore;
 
-public class DynamicRecordCheck
+class DynamicRecordCheck
         implements RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport>,
         ComparativeRecordChecker<DynamicRecord, DynamicRecord, ConsistencyReport.DynamicConsistencyReport>
 {
-    public enum StoreDereference
-    {
-        STRING
-        {
-            @Override
-            RecordReference<DynamicRecord> lookup( RecordAccess records, long block )
-            {
-                return records.string( block );
-            }
-
-            @Override
-            DynamicRecord changed( DiffRecordAccess records, long id )
-            {
-                return records.changedString( id );
-            }
-        },
-        ARRAY
-        {
-            @Override
-            RecordReference<DynamicRecord> lookup( RecordAccess records, long block )
-            {
-                return records.array( block );
-            }
-
-            @Override
-            DynamicRecord changed( DiffRecordAccess records, long id )
-            {
-                return records.changedArray( id );
-            }
-        },
-        PROPERTY_KEY
-        {
-            @Override
-            RecordReference<DynamicRecord> lookup( RecordAccess records, long block )
-            {
-                return records.propertyKeyName( (int) block );
-            }
-
-            @Override
-            DynamicRecord changed( DiffRecordAccess records, long id )
-            {
-                return null; // never needed
-            }
-        },
-        RELATIONSHIP_LABEL
-        {
-            @Override
-            RecordReference<DynamicRecord> lookup( RecordAccess records, long block )
-            {
-                return records.relationshipLabelName( (int) block );
-            }
-
-            @Override
-            DynamicRecord changed( DiffRecordAccess records, long id )
-            {
-                return null; // never needed
-            }
-        };
-
-        abstract RecordReference<DynamicRecord> lookup(RecordAccess records, long block);
-
-        abstract DynamicRecord changed( DiffRecordAccess records, long id );
-    }
-
     private final int blockSize;
-    private final StoreDereference dereference;
+    private final DynamicStore dereference;
 
-    public DynamicRecordCheck( RecordStore<DynamicRecord> store, StoreDereference dereference )
+    DynamicRecordCheck( RecordStore<DynamicRecord> store, DynamicStore dereference )
     {
         this.blockSize = store.getRecordSize() - store.getRecordHeaderSize();
         this.dereference = dereference;

@@ -133,16 +133,6 @@ public abstract class PrimitiveRecordCheck
             for ( RecordField<RECORD, REPORT> field : fields )
             {
                 field.checkChange( oldRecord, newRecord, report, records );
-            // TODO: check
-            /*
-                if ( !newRecord.inUse() || field.valueFrom( newRecord ) != field.valueFrom( oldRecord ) )
-                { // old reference not referenced anymore
-                    if ( !field.isNone( oldRecord ) && !field.referencedRecordChanged( records, oldRecord ) )
-                    { // old reference was to something, and that something has not changed
-                        field.reportNotUpdated( report );
-                    }
-                }
-            */
             }
         }
     }

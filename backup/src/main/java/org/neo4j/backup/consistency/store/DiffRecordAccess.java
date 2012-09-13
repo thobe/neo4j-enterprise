@@ -48,6 +48,8 @@ public interface DiffRecordAccess extends RecordAccess
 
     RecordReference<PropertyRecord> previousProperty( long id );
 
+    RecordReference<NeoStoreRecord> previousGraph();
+
     NodeRecord changedNode( long id );
 
     RelationshipRecord changedRelationship( long id );
@@ -57,6 +59,4 @@ public interface DiffRecordAccess extends RecordAccess
     DynamicRecord changedString( long id );
 
     DynamicRecord changedArray( long id );
-
-    RecordReference<NeoStoreRecord> previousGraph();
 }

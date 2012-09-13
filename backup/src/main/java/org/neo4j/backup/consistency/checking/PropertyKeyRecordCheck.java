@@ -25,7 +25,7 @@ import org.neo4j.backup.consistency.store.RecordReference;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
 
-public class PropertyKeyRecordCheck
+class PropertyKeyRecordCheck
         extends NameRecordCheck<PropertyIndexRecord, ConsistencyReport.PropertyKeyConsistencyReport>
 {
     @Override

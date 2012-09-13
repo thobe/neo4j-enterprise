@@ -8,11 +8,11 @@ import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 
-abstract class PropertyOwner<RECORD extends PrimitiveRecord>
+abstract class PropertyOwner<RECORD extends PrimitiveRecord> implements Owner
 {
     abstract RecordReference<RECORD> record( RecordAccess records );
 
-    void checkOrphanage()
+    public void checkOrphanage()
     {
         // default: do nothing
     }
@@ -73,7 +73,7 @@ abstract class PropertyOwner<RECORD extends PrimitiveRecord>
         }
 
         @Override
-        void checkOrphanage()
+        public void checkOrphanage()
         {
             PendingReferenceCheck<PrimitiveRecord> reporter;
             synchronized ( this )

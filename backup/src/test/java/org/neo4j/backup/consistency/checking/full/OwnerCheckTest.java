@@ -19,16 +19,16 @@
  */
 package org.neo4j.backup.consistency.checking.full;
 
+import org.junit.Ignore;
 import org.junit.Test;
-import org.neo4j.backup.consistency.checking.NeoStoreCheck;
-import org.neo4j.backup.consistency.checking.NodeRecordCheck;
+import org.neo4j.backup.consistency.RecordType;
+import org.neo4j.backup.consistency.checking.DynamicStore;
+import org.neo4j.backup.consistency.checking.PrimitiveRecordCheck;
 import org.neo4j.backup.consistency.checking.RecordCheck;
-import org.neo4j.backup.consistency.checking.RelationshipRecordCheck;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.backup.consistency.store.DiffRecordAccess;
-import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.backup.consistency.store.RecordAccessStub;
 import org.neo4j.helpers.progress.ProgressMonitorFactory;
+import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
@@ -37,20 +37,27 @@ import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import static org.junit.Assert.assertSame;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.neo4j.backup.consistency.checking.DynamicRecordCheckTest.configureDynamicStore;
 import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.NONE;
 import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.check;
+import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.dummyDynamicCheck;
+import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.dummyNeoStoreCheck;
+import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.dummyNodeCheck;
+import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.dummyPropertyChecker;
+import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.dummyRelationshipChecker;
 import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.inUse;
 import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.notInUse;
+import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.string;
 import static org.neo4j.backup.consistency.checking.RecordCheckTestBase.verifyOnlyReferenceDispatch;
 
-public class PropertyOwnerCheckTest
+public class OwnerCheckTest
 {
     @Test
     public void shouldNotDecorateCheckerWhenInactive() throws Exception
     {
         // given
-        PropertyOwnerCheck decorator = new PropertyOwnerCheck( false );
-        NodeRecordCheck checker = new NodeRecordCheck();
+        OwnerCheck decorator = new OwnerCheck( false );
+        PrimitiveRecordCheck<NodeRecord,ConsistencyReport.NodeConsistencyReport> checker = dummyNodeCheck();
 
         // when
         RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> decorated =
@@ -64,9 +71,9 @@ public class PropertyOwnerCheckTest
     public void shouldNotReportAnythingForNodesWithDifferentPropertyChains() throws Exception
     {
         // given
-        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        OwnerCheck decorator = new OwnerCheck( true );
         RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker =
-                decorator.decorateNodeChecker( nodeChecker() );
+                decorator.decorateNodeChecker( dummyNodeCheck() );
 
         RecordAccessStub records = new RecordAccessStub();
 
@@ -88,9 +95,9 @@ public class PropertyOwnerCheckTest
     public void shouldNotReportAnythingForNodesNotInUse() throws Exception
     {
         // given
-        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        OwnerCheck decorator = new OwnerCheck( true );
         RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker =
-                decorator.decorateNodeChecker( nodeChecker() );
+                decorator.decorateNodeChecker( dummyNodeCheck() );
 
         RecordAccessStub records = new RecordAccessStub();
 
@@ -112,9 +119,9 @@ public class PropertyOwnerCheckTest
     public void shouldNotReportAnythingForRelationshipsWithDifferentPropertyChains() throws Exception
     {
         // given
-        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        OwnerCheck decorator = new OwnerCheck( true );
         RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> relationshipChecker =
-                decorator.decorateRelationshipChecker( relationshipChecker() );
+                decorator.decorateRelationshipChecker( dummyRelationshipChecker() );
 
         RecordAccessStub records = new RecordAccessStub();
 
@@ -140,9 +147,9 @@ public class PropertyOwnerCheckTest
     public void shouldReportTwoNodesWithSamePropertyChain() throws Exception
     {
         // given
-        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        OwnerCheck decorator = new OwnerCheck( true );
         RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker =
-                decorator.decorateNodeChecker( nodeChecker() );
+                decorator.decorateNodeChecker( dummyNodeCheck() );
 
         RecordAccessStub records = new RecordAccessStub();
 
@@ -164,9 +171,9 @@ public class PropertyOwnerCheckTest
     public void shouldReportTwoRelationshipsWithSamePropertyChain() throws Exception
     {
         // given
-        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        OwnerCheck decorator = new OwnerCheck( true );
         RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> relationshipChecker =
-                decorator.decorateRelationshipChecker( relationshipChecker() );
+                decorator.decorateRelationshipChecker( dummyRelationshipChecker() );
 
         RecordAccessStub records = new RecordAccessStub();
 
@@ -192,11 +199,11 @@ public class PropertyOwnerCheckTest
     public void shouldReportRelationshipWithSamePropertyChainAsNode() throws Exception
     {
         // given
-        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        OwnerCheck decorator = new OwnerCheck( true );
         RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker =
-                decorator.decorateNodeChecker( nodeChecker() );
+                decorator.decorateNodeChecker( dummyNodeCheck() );
         RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> relationshipChecker =
-                decorator.decorateRelationshipChecker( relationshipChecker() );
+                decorator.decorateRelationshipChecker( dummyRelationshipChecker() );
 
         RecordAccessStub records = new RecordAccessStub();
 
@@ -220,11 +227,11 @@ public class PropertyOwnerCheckTest
     public void shouldReportRelationshipWithReferenceToTheGraphGlobalChain() throws Exception
     {
         // given
-        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        OwnerCheck decorator = new OwnerCheck( true );
         RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> relationshipChecker =
-                decorator.decorateRelationshipChecker( relationshipChecker() );
+                decorator.decorateRelationshipChecker( dummyRelationshipChecker() );
         RecordCheck<NeoStoreRecord, ConsistencyReport.NeoStoreConsistencyReport> neoStoreCheck =
-                decorator.decorateNeoStoreChecker( neoStoreCheck() );
+                decorator.decorateNeoStoreChecker( dummyNeoStoreCheck() );
 
         RecordAccessStub records = new RecordAccessStub();
 
@@ -249,11 +256,11 @@ public class PropertyOwnerCheckTest
     public void shouldReportNodeWithSamePropertyChainAsRelationship() throws Exception
     {
         // given
-        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        OwnerCheck decorator = new OwnerCheck( true );
         RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker =
-                decorator.decorateNodeChecker( nodeChecker() );
+                decorator.decorateNodeChecker( dummyNodeCheck() );
         RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> relationshipChecker =
-                decorator.decorateRelationshipChecker( relationshipChecker() );
+                decorator.decorateRelationshipChecker( dummyRelationshipChecker() );
 
         RecordAccessStub records = new RecordAccessStub();
 
@@ -277,11 +284,11 @@ public class PropertyOwnerCheckTest
     public void shouldReportNodeWithReferenceToTheGraphGlobalChain() throws Exception
     {
         // given
-        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        OwnerCheck decorator = new OwnerCheck( true );
         RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker =
-                decorator.decorateNodeChecker( nodeChecker() );
+                decorator.decorateNodeChecker( dummyNodeCheck() );
         RecordCheck<NeoStoreRecord, ConsistencyReport.NeoStoreConsistencyReport> neoStoreCheck =
-                decorator.decorateNeoStoreChecker( neoStoreCheck() );
+                decorator.decorateNeoStoreChecker( dummyNeoStoreCheck() );
 
         RecordAccessStub records = new RecordAccessStub();
 
@@ -304,11 +311,11 @@ public class PropertyOwnerCheckTest
     public void shouldReportNodeStoreReferencingSameChainAsNode() throws Exception
     {
         // given
-        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        OwnerCheck decorator = new OwnerCheck( true );
         RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker =
-                decorator.decorateNodeChecker( nodeChecker() );
+                decorator.decorateNodeChecker( dummyNodeCheck() );
         RecordCheck<NeoStoreRecord, ConsistencyReport.NeoStoreConsistencyReport> neoStoreCheck =
-                decorator.decorateNeoStoreChecker( neoStoreCheck() );
+                decorator.decorateNeoStoreChecker( dummyNeoStoreCheck() );
 
         RecordAccessStub records = new RecordAccessStub();
 
@@ -331,11 +338,11 @@ public class PropertyOwnerCheckTest
     public void shouldReportNodeStoreReferencingSameChainAsRelationship() throws Exception
     {
         // given
-        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        OwnerCheck decorator = new OwnerCheck( true );
         RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> relationshipChecker =
-                decorator.decorateRelationshipChecker( relationshipChecker() );
+                decorator.decorateRelationshipChecker( dummyRelationshipChecker() );
         RecordCheck<NeoStoreRecord, ConsistencyReport.NeoStoreConsistencyReport> neoStoreCheck =
-                decorator.decorateNeoStoreChecker( neoStoreCheck() );
+                decorator.decorateNeoStoreChecker( dummyNeoStoreCheck() );
 
         RecordAccessStub records = new RecordAccessStub();
 
@@ -361,9 +368,9 @@ public class PropertyOwnerCheckTest
     {
         // given
         RecordAccessStub records = new RecordAccessStub();
-        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        OwnerCheck decorator = new OwnerCheck( true );
         RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> checker = decorator
-                .decoratePropertyChecker( propertyChecker() );
+                .decoratePropertyChecker( dummyPropertyChecker() );
 
         PropertyRecord record = inUse( new PropertyRecord( 42 ) );
         ConsistencyReport.PropertyConsistencyReport report = check(
@@ -383,16 +390,16 @@ public class PropertyOwnerCheckTest
     {
         // given
         RecordAccessStub records = new RecordAccessStub();
-        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        OwnerCheck decorator = new OwnerCheck( true );
 
         PropertyRecord record = inUse( new PropertyRecord( 42 ) );
         ConsistencyReport.PropertyConsistencyReport report =
                 check( ConsistencyReport.PropertyConsistencyReport.class,
-                       decorator.decoratePropertyChecker( propertyChecker() ),
+                       decorator.decoratePropertyChecker( dummyPropertyChecker() ),
                        record, records );
         ConsistencyReport.NodeConsistencyReport nodeReport =
                 check( ConsistencyReport.NodeConsistencyReport.class,
-                       decorator.decorateNodeChecker( nodeChecker() ),
+                       decorator.decorateNodeChecker( dummyNodeCheck() ),
                        inUse( new NodeRecord( 10, NONE, 42 ) ), records );
 
         // when
@@ -410,18 +417,18 @@ public class PropertyOwnerCheckTest
     {
         // given
         RecordAccessStub records = new RecordAccessStub();
-        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        OwnerCheck decorator = new OwnerCheck( true );
 
         PropertyRecord record = inUse( new PropertyRecord( 42 ) );
         ConsistencyReport.PropertyConsistencyReport report =
                 check( ConsistencyReport.PropertyConsistencyReport.class,
-                       decorator.decoratePropertyChecker( propertyChecker() ),
+                       decorator.decoratePropertyChecker( dummyPropertyChecker() ),
                        record, records );
         RelationshipRecord relationship = inUse( new RelationshipRecord( 10, 1, 1, 0 ) );
         relationship.setNextProp( 42 );
         ConsistencyReport.RelationshipConsistencyReport relationshipReport =
                 check( ConsistencyReport.RelationshipConsistencyReport.class,
-                       decorator.decorateRelationshipChecker( relationshipChecker() ),
+                       decorator.decorateRelationshipChecker( dummyRelationshipChecker() ),
                        relationship, records );
 
         // when
@@ -439,18 +446,18 @@ public class PropertyOwnerCheckTest
     {
         // given
         RecordAccessStub records = new RecordAccessStub();
-        PropertyOwnerCheck decorator = new PropertyOwnerCheck( true );
+        OwnerCheck decorator = new OwnerCheck( true );
 
         PropertyRecord record = inUse( new PropertyRecord( 42 ) );
         ConsistencyReport.PropertyConsistencyReport report =
                 check( ConsistencyReport.PropertyConsistencyReport.class,
-                       decorator.decoratePropertyChecker( propertyChecker() ),
+                       decorator.decoratePropertyChecker( dummyPropertyChecker() ),
                        record, records );
         NeoStoreRecord master = inUse( new NeoStoreRecord() );
         master.setNextProp( 42 );
         ConsistencyReport.NeoStoreConsistencyReport masterReport =
                 check( ConsistencyReport.NeoStoreConsistencyReport.class,
-                       decorator.decorateNeoStoreChecker( neoStoreCheck() ),
+                       decorator.decorateNeoStoreChecker( dummyNeoStoreCheck() ),
                        master, records );
 
         // when
@@ -463,76 +470,32 @@ public class PropertyOwnerCheckTest
         verifyOnlyReferenceDispatch( masterReport );
     }
 
-    private static NeoStoreCheck neoStoreCheck()
+    @Test
+    @Ignore("Not completed yet")
+    public void shouldReportDynamicRecordOwnedByTwoOtherDynamicRecords() throws Exception
     {
-        return new NeoStoreCheck()
-        {
-            @Override
-            public void check( NeoStoreRecord record, ConsistencyReport.NeoStoreConsistencyReport report,
-                               RecordAccess records )
-            {
-            }
+        // given
+        RecordAccessStub records = new RecordAccessStub();
+        OwnerCheck decorator = new OwnerCheck( true, DynamicStore.STRING );
 
-            @Override
-            public void checkChange( NeoStoreRecord oldRecord, NeoStoreRecord newRecord,
-                                     ConsistencyReport.NeoStoreConsistencyReport report, DiffRecordAccess records )
-            {
-            }
-        };
-    }
+        RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport> checker = decorator
+                .decorateDynamicChecker( RecordType.STRING_PROPERTY,
+                                         dummyDynamicCheck( configureDynamicStore( 50 ), DynamicStore.STRING ) );
 
-    private static NodeRecordCheck nodeChecker()
-    {
-        return new NodeRecordCheck()
-        {
-            @Override
-            public void check( NodeRecord record, ConsistencyReport.NodeConsistencyReport report,
-                               RecordAccess records )
-            {
-            }
+        DynamicRecord record1 = records.add( string( new DynamicRecord( 1 ) ) );
+        DynamicRecord record2 = records.add( string( new DynamicRecord( 2 ) ) );
+        DynamicRecord record3 = records.add( string( new DynamicRecord( 3 ) ) );
+        record1.setNextBlock( record3.getId() );
+        record2.setNextBlock( record3.getId() );
 
-            @Override
-            public void checkChange( NodeRecord oldRecord, NodeRecord newRecord,
-                                     ConsistencyReport.NodeConsistencyReport report, DiffRecordAccess records )
-            {
-            }
-        };
-    }
+        // when
+        ConsistencyReport.DynamicConsistencyReport report1 = check( ConsistencyReport.DynamicConsistencyReport.class,
+                                                                    checker, record1, records );
+        ConsistencyReport.DynamicConsistencyReport report2 = check( ConsistencyReport.DynamicConsistencyReport.class,
+                                                                    checker, record2, records );
 
-    private static RelationshipRecordCheck relationshipChecker()
-    {
-        return new RelationshipRecordCheck()
-        {
-            @Override
-            public void check( RelationshipRecord record, ConsistencyReport.RelationshipConsistencyReport report,
-                               RecordAccess records )
-            {
-            }
-
-            @Override
-            public void checkChange( RelationshipRecord oldRecord, RelationshipRecord newRecord,
-                                     ConsistencyReport.RelationshipConsistencyReport report,
-                                     DiffRecordAccess records )
-            {
-            }
-        };
-    }
-
-    private static RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> propertyChecker()
-    {
-        return new RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport>()
-        {
-            @Override
-            public void check( PropertyRecord record, ConsistencyReport.PropertyConsistencyReport report,
-                               RecordAccess records )
-            {
-            }
-
-            @Override
-            public void checkChange( PropertyRecord oldRecord, PropertyRecord newRecord,
-                                     ConsistencyReport.PropertyConsistencyReport report, DiffRecordAccess records )
-            {
-            }
-        };
+        // then
+        verifyZeroInteractions( report1 );
+        verify( report2 ).multipleOwners( record1 );
     }
 }

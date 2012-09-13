@@ -32,7 +32,7 @@ import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
 
 import static java.lang.String.format;
-import static org.neo4j.backup.consistency.checking.DynamicRecordCheck.StoreDereference.ARRAY;
+import static org.neo4j.backup.consistency.checking.DynamicStore.ARRAY;
 
 public abstract class AbstractStoreProcessor extends RecordStore.Processor
 {
@@ -42,21 +42,22 @@ public abstract class AbstractStoreProcessor extends RecordStore.Processor
     private final RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> propertyChecker;
     private final RecordCheck<PropertyIndexRecord, ConsistencyReport.PropertyKeyConsistencyReport> propertyKeyChecker;
     private final RecordCheck<RelationshipTypeRecord, ConsistencyReport.LabelConsistencyReport> relationshipLabelChecker;
+    private final CheckDecorator decorator;
 
-    public AbstractStoreProcessor(
-            RecordCheck<NeoStoreRecord, ConsistencyReport.NeoStoreConsistencyReport> neoStoreChecker,
-            RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker,
-            RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> relationshipChecker,
-            RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> propertyChecker,
-            RecordCheck<PropertyIndexRecord, ConsistencyReport.PropertyKeyConsistencyReport> propertyKeyChecker,
-            RecordCheck<RelationshipTypeRecord, ConsistencyReport.LabelConsistencyReport> relationshipLabelChecker )
+    public AbstractStoreProcessor()
     {
-        this.neoStoreChecker = neoStoreChecker;
-        this.nodeChecker = nodeChecker;
-        this.relationshipChecker = relationshipChecker;
-        this.propertyChecker = propertyChecker;
-        this.propertyKeyChecker = propertyKeyChecker;
-        this.relationshipLabelChecker = relationshipLabelChecker;
+        this( CheckDecorator.NONE );
+    }
+
+    public AbstractStoreProcessor( CheckDecorator decorator )
+    {
+        this.decorator = decorator;
+        this.neoStoreChecker = decorator.decorateNeoStoreChecker( new NeoStoreCheck() );
+        this.nodeChecker = decorator.decorateNodeChecker( new NodeRecordCheck() );
+        this.relationshipChecker = decorator.decorateRelationshipChecker( new RelationshipRecordCheck() );
+        this.propertyChecker = decorator.decoratePropertyChecker( new PropertyRecordCheck() );
+        this.propertyKeyChecker = decorator.decoratePropertyKeyChecker( new PropertyKeyRecordCheck() );
+        this.relationshipLabelChecker = decorator.decorateLabelChecker( new RelationshipLabelRecordCheck() );
     }
 
     protected abstract void checkNode( RecordStore<NodeRecord> store, NodeRecord node,
@@ -100,20 +101,20 @@ public abstract class AbstractStoreProcessor extends RecordStore.Processor
     public final void processString( RecordStore<DynamicRecord> store, DynamicRecord string, IdType idType )
     {
         RecordType type;
-        DynamicRecordCheck.StoreDereference dereference;
+        DynamicStore dereference;
         switch ( idType )
         {
         case STRING_BLOCK:
             type = RecordType.STRING_PROPERTY;
-            dereference = DynamicRecordCheck.StoreDereference.STRING;
+            dereference = DynamicStore.STRING;
             break;
         case RELATIONSHIP_TYPE_BLOCK:
             type = RecordType.RELATIONSHIP_LABEL_NAME;
-            dereference = DynamicRecordCheck.StoreDereference.RELATIONSHIP_LABEL;
+            dereference = DynamicStore.RELATIONSHIP_LABEL;
             break;
         case PROPERTY_INDEX_BLOCK:
             type = RecordType.PROPERTY_KEY_NAME;
-            dereference = DynamicRecordCheck.StoreDereference.PROPERTY_KEY;
+            dereference = DynamicStore.PROPERTY_KEY;
             break;
         default:
             throw new IllegalArgumentException( format( "The id type [%s] is not valid for String records.", idType ) );

@@ -22,7 +22,7 @@ package org.neo4j.backup.consistency.checking;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
 import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 
-public class NeoStoreCheck extends PrimitiveRecordCheck<NeoStoreRecord, ConsistencyReport.NeoStoreConsistencyReport>
+class NeoStoreCheck extends PrimitiveRecordCheck<NeoStoreRecord, ConsistencyReport.NeoStoreConsistencyReport>
 {
     // nothing added over PrimitiveRecordCheck
 }

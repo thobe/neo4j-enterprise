@@ -20,13 +20,20 @@
 package org.neo4j.backup.consistency.checking;
 
 import org.neo4j.backup.consistency.report.ConsistencyReport;
+import org.neo4j.backup.consistency.store.DiffRecordAccess;
+import org.neo4j.backup.consistency.store.RecordAccess;
 import org.neo4j.backup.consistency.store.RecordAccessStub;
 import org.neo4j.backup.consistency.store.RecordReference;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
+import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
+import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
+import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyType;
+import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
@@ -47,6 +54,98 @@ public abstract class RecordCheckTestBase<RECORD extends AbstractBaseRecord,
     {
         this.checker = checker;
         this.reportClass = reportClass;
+    }
+
+    public static PrimitiveRecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> dummyNodeCheck()
+    {
+        return new NodeRecordCheck()
+        {
+            @Override
+            public void check( NodeRecord record, ConsistencyReport.NodeConsistencyReport report,
+                               RecordAccess records )
+            {
+            }
+
+            @Override
+            public void checkChange( NodeRecord oldRecord, NodeRecord newRecord,
+                                     ConsistencyReport.NodeConsistencyReport report, DiffRecordAccess records )
+            {
+            }
+        };
+    }
+
+    public static PrimitiveRecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> dummyRelationshipChecker()
+    {
+        return new RelationshipRecordCheck()
+        {
+            @Override
+            public void check( RelationshipRecord record, ConsistencyReport.RelationshipConsistencyReport report,
+                               RecordAccess records )
+            {
+            }
+
+            @Override
+            public void checkChange( RelationshipRecord oldRecord, RelationshipRecord newRecord,
+                                     ConsistencyReport.RelationshipConsistencyReport report,
+                                     DiffRecordAccess records )
+            {
+            }
+        };
+    }
+
+    public static RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> dummyPropertyChecker()
+    {
+        return new RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport>()
+        {
+            @Override
+            public void check( PropertyRecord record, ConsistencyReport.PropertyConsistencyReport report,
+                               RecordAccess records )
+            {
+            }
+
+            @Override
+            public void checkChange( PropertyRecord oldRecord, PropertyRecord newRecord,
+                                     ConsistencyReport.PropertyConsistencyReport report, DiffRecordAccess records )
+            {
+            }
+        };
+    }
+
+    public static PrimitiveRecordCheck<NeoStoreRecord, ConsistencyReport.NeoStoreConsistencyReport> dummyNeoStoreCheck()
+    {
+        return new NeoStoreCheck()
+        {
+            @Override
+            public void check( NeoStoreRecord record, ConsistencyReport.NeoStoreConsistencyReport report,
+                               RecordAccess records )
+            {
+            }
+
+            @Override
+            public void checkChange( NeoStoreRecord oldRecord, NeoStoreRecord newRecord,
+                                     ConsistencyReport.NeoStoreConsistencyReport report, DiffRecordAccess records )
+            {
+            }
+        };
+    }
+
+    public static RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport> dummyDynamicCheck(
+            RecordStore<DynamicRecord> store, DynamicStore dereference )
+    {
+        return new DynamicRecordCheck(store, dereference )
+        {
+            @Override
+            public void checkChange( DynamicRecord oldRecord, DynamicRecord newRecord,
+                                     ConsistencyReport.DynamicConsistencyReport report, DiffRecordAccess records )
+            {
+            }
+
+            @Override
+            public void check( DynamicRecord record, ConsistencyReport.DynamicConsistencyReport report,
+                               RecordAccess records )
+            {
+            }
+        };
     }
 
     final REPORT check( RECORD record )
@@ -99,13 +198,13 @@ public abstract class RecordCheckTestBase<RECORD extends AbstractBaseRecord,
         return records.addLabelName( name );
     }
 
-    static DynamicRecord string( DynamicRecord record )
+    public static DynamicRecord string( DynamicRecord record )
     {
         record.setType( PropertyType.STRING.intValue() );
         return record;
     }
 
-    static DynamicRecord array( DynamicRecord record )
+    public static DynamicRecord array( DynamicRecord record )
     {
         record.setType( PropertyType.ARRAY.intValue() );
         return record;

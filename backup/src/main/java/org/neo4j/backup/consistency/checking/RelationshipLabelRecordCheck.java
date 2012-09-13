@@ -25,7 +25,7 @@ import org.neo4j.backup.consistency.store.RecordReference;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
 
-public class RelationshipLabelRecordCheck
+class RelationshipLabelRecordCheck
     extends NameRecordCheck<RelationshipTypeRecord,ConsistencyReport.LabelConsistencyReport>
 {
     @Override

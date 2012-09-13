@@ -253,7 +253,7 @@ public abstract class DynamicRecordCheckTest
     {
         public StringStore()
         {
-            super( new DynamicRecordCheck( configure( 66 ), DynamicRecordCheck.StoreDereference.STRING ), 66 );
+            super( new DynamicRecordCheck( configureDynamicStore( 66 ), DynamicStore.STRING ), 66 );
         }
 
         @Override
@@ -275,7 +275,7 @@ public abstract class DynamicRecordCheckTest
     {
         public ArrayStore()
         {
-            super( new DynamicRecordCheck( configure( 66 ), DynamicRecordCheck.StoreDereference.ARRAY ), 66 );
+            super( new DynamicRecordCheck( configureDynamicStore( 66 ), DynamicStore.ARRAY ), 66 );
         }
 
         @Override
@@ -292,7 +292,7 @@ public abstract class DynamicRecordCheckTest
         }
     }
 
-    static RecordStore<DynamicRecord> configure( int blockSize )
+    public static RecordStore<DynamicRecord> configureDynamicStore( int blockSize )
     {
         @SuppressWarnings( "unchecked" )
         RecordStore<DynamicRecord> mock = mock( RecordStore.class );

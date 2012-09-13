@@ -30,6 +30,7 @@ import org.neo4j.backup.consistency.checking.RecordCheck;
 import org.neo4j.backup.consistency.store.RecordReference;
 import org.neo4j.kernel.impl.annotations.Documented;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
+import org.neo4j.kernel.impl.nioneo.store.AbstractNameRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
@@ -356,7 +357,8 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
         void changedForWrongOwner();
     }
 
-    interface LabelConsistencyReport extends ConsistencyReport<RelationshipTypeRecord, LabelConsistencyReport>
+    interface NameConsistencyReport<RECORD extends AbstractNameRecord, REPORT extends NameConsistencyReport<RECORD,REPORT>>
+            extends ConsistencyReport<RECORD,REPORT>
     {
         /** The name block is not in use. */
         @Documented
@@ -368,16 +370,12 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
         void emptyName( DynamicRecord name );
     }
 
-    interface PropertyKeyConsistencyReport extends ConsistencyReport<PropertyIndexRecord, PropertyKeyConsistencyReport>
+    interface LabelConsistencyReport extends NameConsistencyReport<RelationshipTypeRecord, LabelConsistencyReport>
     {
-        /** The name block is not in use. */
-        @Documented
-        void nameBlockNotInUse( DynamicRecord name );
+    }
 
-        /** The name is empty. */
-        @Documented
-        @Warning
-        void emptyName( DynamicRecord name );
+    interface PropertyKeyConsistencyReport extends NameConsistencyReport<PropertyIndexRecord, PropertyKeyConsistencyReport>
+    {
     }
 
     interface DynamicConsistencyReport extends ConsistencyReport<DynamicRecord, DynamicConsistencyReport>
@@ -413,5 +411,10 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
         @Documented
         @IncrementalOnly
         void nextNotUpdated();
+
+        /** The next block of this record is also referenced by another dynamic record. */
+        @Documented
+        @IncrementalOnly
+        void multipleOwners( DynamicRecord otherOwner );
     }
 }

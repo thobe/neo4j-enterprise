@@ -32,7 +32,7 @@ import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyType;
 import org.neo4j.kernel.impl.nioneo.store.Record;
 
-public class PropertyRecordCheck
+class PropertyRecordCheck
         implements RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport>
 {
     @Override

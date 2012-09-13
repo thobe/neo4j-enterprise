@@ -21,13 +21,8 @@ package org.neo4j.backup.consistency.checking.full;
 
 import org.neo4j.backup.consistency.RecordType;
 import org.neo4j.backup.consistency.checking.AbstractStoreProcessor;
-import org.neo4j.backup.consistency.checking.NeoStoreCheck;
-import org.neo4j.backup.consistency.checking.NodeRecordCheck;
-import org.neo4j.backup.consistency.checking.PropertyKeyRecordCheck;
-import org.neo4j.backup.consistency.checking.PropertyRecordCheck;
+import org.neo4j.backup.consistency.checking.DynamicStore;
 import org.neo4j.backup.consistency.checking.RecordCheck;
-import org.neo4j.backup.consistency.checking.RelationshipLabelRecordCheck;
-import org.neo4j.backup.consistency.checking.RelationshipRecordCheck;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
 import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
@@ -41,23 +36,18 @@ import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
 class StoreProcessor extends AbstractStoreProcessor
 {
     private final ConsistencyReport.Reporter report;
-    private final PropertyOwnerCheck ownerCheck;
+    private final OwnerCheck ownerCheck;
 
     StoreProcessor( boolean checkPropertyOwners, ConsistencyReport.Reporter report )
     {
-        this( new PropertyOwnerCheck( checkPropertyOwners ), report );
+        this( new OwnerCheck( checkPropertyOwners, DynamicStore.values() ), report );
     }
 
-    private StoreProcessor( PropertyOwnerCheck ownerCheck, ConsistencyReport.Reporter report )
+    private StoreProcessor( OwnerCheck ownerCheck, ConsistencyReport.Reporter report )
     {
-        super( ownerCheck.decorateNeoStoreChecker( new NeoStoreCheck() ),
-               ownerCheck.decorateNodeChecker( new NodeRecordCheck() ),
-               ownerCheck.decorateRelationshipChecker( new RelationshipRecordCheck() ),
-               ownerCheck.decoratePropertyChecker( new PropertyRecordCheck() ),
-               ownerCheck.decoratePropertyKeyChecker( new PropertyKeyRecordCheck() ),
-               ownerCheck.decorateLabelChecker( new RelationshipLabelRecordCheck() ) );
-        this.report = report;
+        super( ownerCheck );
         this.ownerCheck = ownerCheck;
+        this.report = report;
     }
 
     void checkOrphanPropertyChains( ProgressMonitorFactory progressFactory )
