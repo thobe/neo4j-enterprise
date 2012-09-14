@@ -20,6 +20,7 @@
 package org.neo4j.backup.consistency.checking.full;
 
 import java.io.File;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -30,6 +31,8 @@ import org.neo4j.backup.consistency.report.ConsistencyReport;
 import org.neo4j.backup.consistency.report.ConsistencyReporter;
 import org.neo4j.backup.consistency.report.ConsistencySummaryStatistics;
 import org.neo4j.backup.consistency.report.MessageConsistencyLogger;
+import org.neo4j.backup.consistency.store.CacheSmallStoresRecordAccess;
+import org.neo4j.backup.consistency.store.DiffRecordAccess;
 import org.neo4j.backup.consistency.store.DirectRecordAccess;
 import org.neo4j.graphdb.factory.GraphDatabaseSetting;
 import org.neo4j.helpers.progress.Completion;
@@ -82,13 +85,32 @@ public class FullCheck
     public void execute( StoreAccess store, StringLogger logger ) throws ConsistencyCheckIncompleteException
     {
         ConsistencyReporter reporter = new ConsistencyReporter( new MessageConsistencyLogger( logger ),
-                                                                new DirectRecordAccess( store ) );
+                                                                recordAccess( store ) );
         execute( store, reporter );
         ConsistencySummaryStatistics summary = reporter.getSummary();
         if ( !summary.isConsistent() )
         {
             logger.logMessage( "Inconsistencies found: " + summary );
         }
+    }
+
+    private DiffRecordAccess recordAccess( StoreAccess store )
+    {
+        return new CacheSmallStoresRecordAccess(
+                new DirectRecordAccess( store ),
+                readAllRecords( PropertyIndexRecord.class, store.getPropertyIndexStore() ),
+                readAllRecords( RelationshipTypeRecord.class, store.getRelationshipTypeStore() ) );
+    }
+
+    private static <T extends AbstractBaseRecord> T[] readAllRecords( Class<T> type, RecordStore<T> store )
+    {
+        @SuppressWarnings("unchecked")
+        T[] records = (T[]) Array.newInstance( type, (int) store.getHighId() );
+        for ( int i = 0; i < records.length; i++ )
+        {
+            records[i] = store.forceGetRecord( i );
+        }
+        return records;
     }
 
     public void execute( StoreAccess store, ConsistencyReport.Reporter reporter )

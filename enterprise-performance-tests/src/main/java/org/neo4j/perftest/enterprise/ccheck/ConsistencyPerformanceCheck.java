@@ -110,7 +110,8 @@ public class ConsistencyPerformanceCheck
             {
                 FullCheck.run( progress, storeDir,
                         new Config( new ConfigurationDefaults( GraphDatabaseSettings.class ).apply( stringMap(
-                                GraphDatabaseSettings.all_stores_total_mapped_memory_size.name(), "6G",
+                                GraphDatabaseSettings.all_stores_total_mapped_memory_size.name(), "12M",
+                                GraphDatabaseSettings.mapped_memory_page_size.name(), "1k",
                                 use_scan_resistant_window_pools.name(), "true",
                                 consistency_check_single_threaded.name(), "true" ) ) ),
                         StringLogger.DEV_NULL );

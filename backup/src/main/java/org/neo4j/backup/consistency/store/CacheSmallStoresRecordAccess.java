@@ -19,7 +19,6 @@
  */
 package org.neo4j.backup.consistency.store;
 
-import org.neo4j.backup.consistency.report.PendingReferenceCheck;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
@@ -28,129 +27,146 @@ import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
 
-@SuppressWarnings("unchecked")
-public class SkippingRecordAccess implements DiffRecordAccess
+public class CacheSmallStoresRecordAccess implements DiffRecordAccess
 {
-    private static final RecordReference SKIP = new RecordReference()
+    private final DiffRecordAccess delegate;
+    private final PropertyIndexRecord[] propertyRecords;
+    private final RelationshipTypeRecord[] relationshipLabels;
+
+    public CacheSmallStoresRecordAccess( DiffRecordAccess delegate,
+                                         PropertyIndexRecord[] propertyRecords,
+                                         RelationshipTypeRecord[] relationshipLabels )
     {
-        @Override
-        public void dispatch( PendingReferenceCheck reporter )
-        {
-            reporter.skip();
-        }
-    };
+        this.delegate = delegate;
+        this.propertyRecords = propertyRecords;
+        this.relationshipLabels = relationshipLabels;
+    }
 
     @Override
     public RecordReference<NodeRecord> node( long id )
     {
-        return SKIP;
+        return delegate.node( id );
     }
 
     @Override
     public RecordReference<RelationshipRecord> relationship( long id )
     {
-        return SKIP;
+        return delegate.relationship( id );
     }
 
     @Override
     public RecordReference<PropertyRecord> property( long id )
     {
-        return SKIP;
+        return delegate.property( id );
     }
 
     @Override
     public RecordReference<RelationshipTypeRecord> relationshipLabel( int id )
     {
-        return SKIP;
+        if ( id < relationshipLabels.length )
+        {
+            return new DirectRecordReference<RelationshipTypeRecord>( relationshipLabels[id], this );
+        }
+        else
+        {
+            return delegate.relationshipLabel( id );
+        }
     }
 
     @Override
     public RecordReference<PropertyIndexRecord> propertyKey( int id )
     {
-        return SKIP;
+        if ( id < propertyRecords.length )
+        {
+            return new DirectRecordReference<PropertyIndexRecord>( propertyRecords[id], this );
+        }
+        else
+        {
+            return delegate.propertyKey( id );
+        }
     }
 
     @Override
     public RecordReference<DynamicRecord> string( long id )
     {
-        return SKIP;
+        return delegate.string( id );
     }
 
     @Override
     public RecordReference<DynamicRecord> array( long id )
     {
-        return SKIP;
+        return delegate.array( id );
     }
 
     @Override
     public RecordReference<DynamicRecord> relationshipLabelName( int id )
     {
-        return SKIP;
+        return delegate.relationshipLabelName( id );
     }
 
     @Override
     public RecordReference<DynamicRecord> propertyKeyName( int id )
     {
-        return SKIP;
+        return delegate.propertyKeyName( id );
     }
 
     @Override
     public RecordReference<NeoStoreRecord> graph()
     {
-        return SKIP;
+        return delegate.graph();
     }
 
     @Override
     public RecordReference<NodeRecord> previousNode( long id )
     {
-        return SKIP;
+        return delegate.previousNode( id );
     }
 
     @Override
     public RecordReference<RelationshipRecord> previousRelationship( long id )
     {
-        return SKIP;
+        return delegate.previousRelationship( id );
     }
 
     @Override
     public RecordReference<PropertyRecord> previousProperty( long id )
     {
-        return SKIP;
+        return delegate.previousProperty( id );
     }
 
     @Override
     public RecordReference<NeoStoreRecord> previousGraph()
     {
-        return SKIP;
+        return delegate.previousGraph();
     }
 
     @Override
     public NodeRecord changedNode( long id )
     {
-        return null;
+        return delegate.changedNode( id );
     }
 
     @Override
     public RelationshipRecord changedRelationship( long id )
     {
-        return null;
+        return delegate.changedRelationship( id );
     }
 
     @Override
     public PropertyRecord changedProperty( long id )
     {
-        return null;
+        return delegate.changedProperty( id );
     }
 
     @Override
     public DynamicRecord changedString( long id )
     {
-        return null;
+        return delegate.changedString( id );
     }
 
     @Override
     public DynamicRecord changedArray( long id )
     {
-        return null;
+        return delegate.changedArray( id );
     }
 }
