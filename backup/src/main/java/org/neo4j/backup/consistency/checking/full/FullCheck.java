@@ -23,20 +23,14 @@ import java.io.File;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
-import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.backup.consistency.report.ConsistencyReporter;
+import org.neo4j.backup.consistency.checking.CheckDecorator;
 import org.neo4j.backup.consistency.report.ConsistencySummaryStatistics;
 import org.neo4j.backup.consistency.report.MessageConsistencyLogger;
 import org.neo4j.backup.consistency.store.CacheSmallStoresRecordAccess;
 import org.neo4j.backup.consistency.store.DiffRecordAccess;
 import org.neo4j.backup.consistency.store.DirectRecordAccess;
 import org.neo4j.graphdb.factory.GraphDatabaseSetting;
-import org.neo4j.helpers.progress.Completion;
-import org.neo4j.helpers.progress.ProgressListener;
 import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.DefaultFileSystemAbstraction;
 import org.neo4j.kernel.DefaultIdGeneratorFactory;
@@ -59,6 +53,16 @@ import org.neo4j.kernel.impl.nioneo.store.windowpool.ScanResistantWindowPoolFact
 import org.neo4j.kernel.impl.nioneo.store.windowpool.WindowPoolFactory;
 import org.neo4j.kernel.impl.util.StringLogger;
 
+import static org.neo4j.backup.consistency.checking.full.FilteringStoreProcessor.ARRAYS_ONLY;
+import static org.neo4j.backup.consistency.checking.full.FilteringStoreProcessor.EVERYTHING;
+import static org.neo4j.backup.consistency.checking.full.FilteringStoreProcessor.NODES_ONLY;
+import static org.neo4j.backup.consistency.checking.full.FilteringStoreProcessor.PROPERTIES_ONLY;
+import static org.neo4j.backup.consistency.checking.full.FilteringStoreProcessor.RELATIONSHIPS_ONLY;
+import static org.neo4j.backup.consistency.checking.full.FilteringStoreProcessor.STRINGS_ONLY;
+import static org.neo4j.backup.consistency.checking.full.StoreProcessorTask.TaskExecution.MULTI_PASS;
+import static org.neo4j.backup.consistency.checking.full.StoreProcessorTask.TaskExecution.MULTI_THREADED;
+import static org.neo4j.backup.consistency.checking.full.StoreProcessorTask.TaskExecution.SINGLE_THREADED;
+
 public class FullCheck
 {
     /** Defaults to false due to the way Boolean.parseBoolean(null) works. */
@@ -68,29 +72,116 @@ public class FullCheck
     public static final GraphDatabaseSetting<Boolean> consistency_check_single_threaded =
             new GraphDatabaseSetting.BooleanSetting( "consistency_check_single_threaded" );
     /** Defaults to false due to the way Boolean.parseBoolean(null) works. */
+    public static final GraphDatabaseSetting<Boolean> consistency_check_multiple_passes =
+            new GraphDatabaseSetting.BooleanSetting( "consistency_check_multiple_passes" );
+    /** Defaults to false due to the way Boolean.parseBoolean(null) works. */
     public static final GraphDatabaseSetting<Boolean> use_scan_resistant_window_pools =
             new GraphDatabaseSetting.BooleanSetting( "use_scan_resistant_window_pools" );
 
     private final boolean checkPropertyOwners;
-    private final TaskExecution execution;
+    private final StoreProcessorTask.TaskExecution execution;
     private final ProgressMonitorFactory progressFactory;
 
-    public FullCheck( boolean checkPropertyOwners, boolean singleThreaded, ProgressMonitorFactory progressFactory )
+    public FullCheck( boolean checkPropertyOwners, ProgressMonitorFactory progressFactory )
+    {
+        this(checkPropertyOwners, MULTI_THREADED, progressFactory);
+    }
+
+    FullCheck( boolean checkPropertyOwners, StoreProcessorTask.TaskExecution execution,
+               ProgressMonitorFactory progressFactory )
     {
         this.checkPropertyOwners = checkPropertyOwners;
-        this.execution = singleThreaded ? TaskExecution.SINGLE_THREADED : TaskExecution.MULTI_THREADED;
+        this.execution = execution;
         this.progressFactory = progressFactory;
     }
 
-    public void execute( StoreAccess store, StringLogger logger ) throws ConsistencyCheckIncompleteException
+    public ConsistencySummaryStatistics execute( StoreAccess store, StringLogger logger ) throws ConsistencyCheckIncompleteException
     {
-        ConsistencyReporter reporter = new ConsistencyReporter( new MessageConsistencyLogger( logger ),
-                                                                recordAccess( store ) );
-        execute( store, reporter );
-        ConsistencySummaryStatistics summary = reporter.getSummary();
+        ConsistencySummaryStatistics summary = new ConsistencySummaryStatistics();
+        OwnerCheck ownerCheck = new OwnerCheck( checkPropertyOwners );
+        execute( store, ownerCheck, recordAccess( store ), new MessageConsistencyLogger( logger ), summary );
+        ownerCheck.scanForOrphanChains( progressFactory );
         if ( !summary.isConsistent() )
         {
             logger.logMessage( "Inconsistencies found: " + summary );
+        }
+        return summary;
+    }
+
+    private void execute( StoreAccess store, CheckDecorator decorator, DiffRecordAccess recordAccess,
+                          MessageConsistencyLogger logger, ConsistencySummaryStatistics summary )
+            throws ConsistencyCheckIncompleteException
+    {
+        FilteringStoreProcessor.Factory processorFactory = new FilteringStoreProcessor.Factory(
+                decorator, logger, recordAccess, summary );
+        StoreProcessor processEverything = processorFactory.create( EVERYTHING );
+
+        ProgressMonitorFactory.MultiPartBuilder progress = progressFactory.multipleParts( "Full consistency check" );
+        List<StoreProcessorTask> tasks = new ArrayList<StoreProcessorTask>( 9 );
+
+        tasks.add( new StoreProcessorTask<NodeRecord>( store.getNodeStore(), progress,
+                                                       processorFactory.createAll( PROPERTIES_ONLY,
+                                                                                   RELATIONSHIPS_ONLY ) ) );
+        tasks.add( new StoreProcessorTask<RelationshipRecord>( store.getRelationshipStore(), progress,
+                                                               processorFactory.createAll( NODES_ONLY,
+                                                                                           PROPERTIES_ONLY,
+                                                                                           RELATIONSHIPS_ONLY ) ) );
+        tasks.add( new StoreProcessorTask<PropertyRecord>( store.getPropertyStore(), progress,
+                                                           processorFactory.createAll( PROPERTIES_ONLY,
+                                                                                       STRINGS_ONLY,
+                                                                                       ARRAYS_ONLY ) ) );
+
+        tasks.add( new StoreProcessorTask<RelationshipTypeRecord>( store.getRelationshipTypeStore(), progress,
+                                                                   processEverything ) );
+        tasks.add( new StoreProcessorTask<PropertyIndexRecord>( store.getPropertyIndexStore(), progress,
+                                                                processEverything ) );
+
+        tasks.add( new StoreProcessorTask<DynamicRecord>( store.getStringStore(), progress, processEverything ) );
+        tasks.add( new StoreProcessorTask<DynamicRecord>( store.getArrayStore(), progress, processEverything ) );
+        tasks.add( new StoreProcessorTask<DynamicRecord>( store.getTypeNameStore(), progress, processEverything ) );
+        tasks.add( new StoreProcessorTask<DynamicRecord>( store.getPropertyKeyStore(), progress, processEverything ) );
+
+        execution.execute( processEverything, tasks, progress.build() );
+    }
+
+    public static void run( ProgressMonitorFactory progressFactory, String storeDir, Config config,
+                            StringLogger logger ) throws ConsistencyCheckIncompleteException
+    {
+        StoreFactory factory = new StoreFactory(
+                config,
+                new DefaultIdGeneratorFactory(),
+                windowPoolFactory( config ),
+                new DefaultFileSystemAbstraction(),
+                new DefaultLastCommittedTxIdSetter(),
+                logger,
+                new DefaultTxHook() );
+        NeoStore neoStore = factory.newNeoStore( new File( storeDir, NeoStore.DEFAULT_NAME ).getAbsolutePath() );
+        try
+        {
+            StoreAccess store = new StoreAccess( neoStore );
+            new FullCheck( config.get( consistency_check_property_owners ),
+                           executionMode( config ),
+                           progressFactory ).execute( store, logger );
+        }
+        finally
+        {
+            neoStore.close();
+        }
+    }
+
+    private static StoreProcessorTask.TaskExecution executionMode( Config config )
+    {
+        if ( config.get( consistency_check_multiple_passes ) )
+        {
+            return MULTI_PASS;
+        }
+        else if ( config.get( consistency_check_single_threaded ) )
+        {
+            return SINGLE_THREADED;
+        }
+        else
+        {
+            return MULTI_THREADED;
         }
     }
 
@@ -113,118 +204,6 @@ public class FullCheck
         return records;
     }
 
-    public void execute( StoreAccess store, ConsistencyReport.Reporter reporter )
-            throws ConsistencyCheckIncompleteException
-    {
-        StoreProcessor processor = new StoreProcessor( checkPropertyOwners, reporter );
-
-        ProgressMonitorFactory.MultiPartBuilder progress = progressFactory.multipleParts( "Full consistency check" );
-        List<StoreProcessorTask> tasks = new ArrayList<StoreProcessorTask>( 9 );
-
-        tasks.add( new StoreProcessorTask<NodeRecord>( store.getNodeStore(), processor, progress ) );
-        tasks.add( new StoreProcessorTask<RelationshipRecord>( store.getRelationshipStore(), processor, progress ) );
-        tasks.add( new StoreProcessorTask<PropertyRecord>( store.getPropertyStore(), processor, progress ) );
-
-        tasks.add( new StoreProcessorTask<RelationshipTypeRecord>( store.getRelationshipTypeStore(), processor,
-                                                                   progress ) );
-        tasks.add( new StoreProcessorTask<PropertyIndexRecord>( store.getPropertyIndexStore(), processor, progress ) );
-
-        tasks.add( new StoreProcessorTask<DynamicRecord>( store.getStringStore(), processor, progress ) );
-        tasks.add( new StoreProcessorTask<DynamicRecord>( store.getArrayStore(), processor, progress ) );
-        tasks.add( new StoreProcessorTask<DynamicRecord>( store.getTypeNameStore(), processor, progress ) );
-        tasks.add( new StoreProcessorTask<DynamicRecord>( store.getPropertyKeyStore(), processor, progress ) );
-
-        execution.execute( processor, tasks, progress.build() );
-
-        processor.checkOrphanPropertyChains( progressFactory );
-    }
-
-    private enum TaskExecution
-    {
-        MULTI_THREADED
-        {
-            @Override
-            void execute( StoreProcessor processor, List<StoreProcessorTask> tasks, Completion completion )
-                    throws ConsistencyCheckIncompleteException
-            {
-                ExecutorService executor = Executors.newFixedThreadPool( Runtime.getRuntime().availableProcessors() );
-                for ( Runnable task : tasks )
-                {
-                    executor.submit( task );
-                }
-
-                try
-                {
-                    completion.await( 7, TimeUnit.DAYS );
-                }
-                catch ( Exception e )
-                {
-                    processor.stopScanning();
-                    throw new ConsistencyCheckIncompleteException( e );
-                }
-                finally
-                {
-                    executor.shutdown();
-                    try
-                    {
-                        executor.awaitTermination( 10, TimeUnit.SECONDS );
-                    }
-                    catch ( InterruptedException e )
-                    {
-                        // don't care
-                    }
-                }
-            }
-        },
-        SINGLE_THREADED
-        {
-            @Override
-            void execute( StoreProcessor processor, List<StoreProcessorTask> tasks, Completion completion )
-                    throws ConsistencyCheckIncompleteException
-            {
-                try
-                {
-                    for ( StoreProcessorTask task : tasks )
-                    {
-                        task.run();
-                    }
-                }
-                catch ( Exception e )
-                {
-                    throw new ConsistencyCheckIncompleteException( e );
-                }
-            }
-        };
-
-        abstract void execute( StoreProcessor processor, List<StoreProcessorTask> tasks, Completion completion )
-                throws ConsistencyCheckIncompleteException;
-    }
-
-    public static void run( ProgressMonitorFactory progressFactory, String storeDir, Config config,
-                            StringLogger logger ) throws ConsistencyCheckIncompleteException
-    {
-        StoreFactory factory = new StoreFactory(
-                config,
-                new DefaultIdGeneratorFactory(),
-                windowPoolFactory( config ),
-                new DefaultFileSystemAbstraction(),
-                new DefaultLastCommittedTxIdSetter(),
-                logger,
-                new DefaultTxHook() );
-        NeoStore neoStore = factory.newNeoStore( new File( storeDir, NeoStore.DEFAULT_NAME ).getAbsolutePath() );
-        try
-        {
-            StoreAccess store = new StoreAccess( neoStore );
-            new FullCheck( config.get( consistency_check_property_owners ),
-                           config.get( consistency_check_single_threaded ),
-                           progressFactory ).execute( store, logger );
-        }
-        finally
-        {
-            neoStore.close();
-        }
-    }
-
     private static WindowPoolFactory windowPoolFactory( Config config )
     {
         if ( config.get( use_scan_resistant_window_pools ) )
@@ -234,37 +213,6 @@ public class FullCheck
         else
         {
             return new DefaultWindowPoolFactory();
-        }
-    }
-
-    private static class StoreProcessorTask<R extends AbstractBaseRecord> implements Runnable
-    {
-        private final RecordStore<R> store;
-        private final StoreProcessor processor;
-        private final ProgressListener progressListener;
-
-        StoreProcessorTask( RecordStore<R> store, StoreProcessor processor,
-                            ProgressMonitorFactory.MultiPartBuilder builder )
-        {
-            this.store = store;
-            this.processor = processor;
-            String name = store.getStorageFileName();
-            this.progressListener = builder
-                    .progressForPart( name.substring( name.lastIndexOf( '/' ) + 1 ), store.getHighId() );
-        }
-
-        @Override
-        @SuppressWarnings("unchecked")
-        public void run()
-        {
-            try
-            {
-                processor.applyFiltered( store, progressListener );
-            }
-            catch ( Throwable e )
-            {
-                progressListener.failed( e );
-            }
         }
     }
 }

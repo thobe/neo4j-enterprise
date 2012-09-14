@@ -21,12 +21,8 @@ package org.neo4j.backup.consistency.checking.incremental;
 
 import org.neo4j.backup.consistency.checking.InconsistentStoreException;
 import org.neo4j.backup.consistency.checking.full.ConsistencyCheckIncompleteException;
-import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.backup.consistency.report.ConsistencyReporter;
 import org.neo4j.backup.consistency.report.ConsistencySummaryStatistics;
-import org.neo4j.backup.consistency.report.MessageConsistencyLogger;
 import org.neo4j.backup.consistency.store.DiffStore;
-import org.neo4j.backup.consistency.store.DirectRecordAccess;
 import org.neo4j.kernel.impl.util.StringLogger;
 
 public abstract class DiffCheck
@@ -40,19 +36,10 @@ public abstract class DiffCheck
 
     public final void check( DiffStore diffs ) throws InconsistentStoreException, ConsistencyCheckIncompleteException
     {
-        ConsistencyReporter reporter = new ConsistencyReporter( new MessageConsistencyLogger( logger ),
-                                                                new DirectRecordAccess( diffs ) );
-        try
-        {
-            execute( diffs, reporter );
-        }
-        finally
-        {
-            verify( diffs, reporter.getSummary() );
-        }
+        verify( diffs, execute( diffs ) );
     }
 
-    public abstract void execute( DiffStore diffs, ConsistencyReport.Reporter reporter )
+    public abstract ConsistencySummaryStatistics execute( DiffStore diffs )
             throws ConsistencyCheckIncompleteException;
 
     protected void verify( DiffStore diffs, ConsistencySummaryStatistics summary )

@@ -19,18 +19,19 @@
  */
 package org.neo4j.backup.consistency.checking.full;
 
+import org.junit.Test;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
+import org.neo4j.backup.consistency.checking.CheckDecorator;
+import org.neo4j.backup.consistency.report.ConsistencyReport;
+import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
+import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-
-import org.junit.Test;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
-import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
 
 public class StoreProcessorTest
 {
@@ -38,7 +39,7 @@ public class StoreProcessorTest
     public void shouldProcessAllTheRecordsInAStore() throws Exception
     {
         // given
-        StoreProcessor processor = new StoreProcessor( false, mock( ConsistencyReport.Reporter.class ) );
+        StoreProcessor processor = new StoreProcessor( CheckDecorator.NONE, mock( ConsistencyReport.Reporter.class ) );
         RecordStore recordStore = mock( RecordStore.class );
         when( recordStore.getHighId() ).thenReturn( 3L );
         when( recordStore.forceGetRecord( any( Long.class ) ) ).thenReturn( new NodeRecord( 0, 0, 0 ) );
@@ -57,7 +58,7 @@ public class StoreProcessorTest
     public void shouldStopProcessingRecordsWhenSignalledToStop() throws Exception
     {
         // given
-        final StoreProcessor processor = new StoreProcessor( false, mock( ConsistencyReport.Reporter.class ) );
+        final StoreProcessor processor = new StoreProcessor( CheckDecorator.NONE, mock( ConsistencyReport.Reporter.class ) );
         RecordStore recordStore = mock( RecordStore.class );
         when( recordStore.getHighId() ).thenReturn( 3L );
         when( recordStore.forceGetRecord( 0L ) ).thenReturn( new NodeRecord( 0, 0, 0 ) );

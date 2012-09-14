@@ -137,7 +137,7 @@ public class ConsistencyReporterTest
             // given
             ConsistencyLogger logger = mock( ConsistencyLogger.class );
             ConsistencyReport.Reporter reporter = new ConsistencyReporter(
-                    logger, mock( DiffRecordAccess.class ) );
+                    logger, mock( DiffRecordAccess.class ), new ConsistencySummaryStatistics() );
 
             // when
             reportMethod.invoke( reporter, parameters( reportMethod ) );

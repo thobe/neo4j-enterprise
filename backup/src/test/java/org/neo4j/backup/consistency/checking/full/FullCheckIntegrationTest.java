@@ -25,10 +25,7 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.neo4j.backup.consistency.RecordType;
-import org.neo4j.backup.consistency.report.ConsistencyReporter;
 import org.neo4j.backup.consistency.report.ConsistencySummaryStatistics;
-import org.neo4j.backup.consistency.report.MessageConsistencyLogger;
-import org.neo4j.backup.consistency.store.DirectRecordAccess;
 import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
@@ -82,11 +79,8 @@ public class FullCheckIntegrationTest
 
     private ConsistencySummaryStatistics check( StoreAccess access ) throws ConsistencyCheckIncompleteException
     {
-        ConsistencyReporter reporter = new ConsistencyReporter(
-                new MessageConsistencyLogger( StringLogger.wrap( log ) ), new DirectRecordAccess( access ) );
-        FullCheck checker = new FullCheck( true, true, ProgressMonitorFactory.NONE );
-        checker.execute( access, reporter );
-        return reporter.getSummary();
+        FullCheck checker = new FullCheck( true, StoreProcessorTask.TaskExecution.SINGLE_THREADED, ProgressMonitorFactory.NONE );
+        return checker.execute( access, StringLogger.wrap( log ) );
     }
 
     private void verifyInconsistency( RecordType recordType, ConsistencySummaryStatistics stats )

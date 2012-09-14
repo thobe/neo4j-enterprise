@@ -33,7 +33,7 @@ public class ConsistencySummaryStatistics
     private final AtomicInteger totalInconsistencyCount = new AtomicInteger();
     private final AtomicLong errorCount = new AtomicLong(), warningCount = new AtomicLong();
 
-    ConsistencySummaryStatistics()
+    public ConsistencySummaryStatistics()
     {
         for ( RecordType recordType : RecordType.values() )
         {

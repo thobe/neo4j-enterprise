@@ -32,8 +32,8 @@ import javax.transaction.xa.Xid;
 import org.neo4j.backup.consistency.checking.full.ConsistencyCheckIncompleteException;
 import org.neo4j.backup.consistency.checking.full.FullCheck;
 import org.neo4j.helpers.Args;
-import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.helpers.ProgressIndicator;
+import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.InternalAbstractGraphDatabase;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.configuration.ConfigParam;
@@ -228,7 +228,7 @@ class RebuildFromLogs
 
     private void checkConsistency() throws ConsistencyCheckIncompleteException
     {
-        new FullCheck( true, false, ProgressMonitorFactory.textual( System.err ) ).execute( stores, StringLogger.SYSTEM );
+        new FullCheck( true, ProgressMonitorFactory.textual( System.err ) ).execute( stores, StringLogger.SYSTEM );
     }
 
     private static void printUsage( String... msgLines )

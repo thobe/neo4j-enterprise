@@ -21,10 +21,9 @@ package org.neo4j.backup.consistency.checking.full;
 
 import org.neo4j.backup.consistency.RecordType;
 import org.neo4j.backup.consistency.checking.AbstractStoreProcessor;
-import org.neo4j.backup.consistency.checking.DynamicStore;
+import org.neo4j.backup.consistency.checking.CheckDecorator;
 import org.neo4j.backup.consistency.checking.RecordCheck;
 import org.neo4j.backup.consistency.report.ConsistencyReport;
-import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
@@ -36,25 +35,12 @@ import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
 class StoreProcessor extends AbstractStoreProcessor
 {
     private final ConsistencyReport.Reporter report;
-    private final OwnerCheck ownerCheck;
 
-    StoreProcessor( boolean checkPropertyOwners, ConsistencyReport.Reporter report )
+    public StoreProcessor( CheckDecorator decorator, ConsistencyReport.Reporter report )
     {
-        this( new OwnerCheck( checkPropertyOwners, DynamicStore.values() ), report );
-    }
-
-    private StoreProcessor( OwnerCheck ownerCheck, ConsistencyReport.Reporter report )
-    {
-        super( ownerCheck );
-        this.ownerCheck = ownerCheck;
+        super( decorator );
         this.report = report;
     }
-
-    void checkOrphanPropertyChains( ProgressMonitorFactory progressFactory )
-    {
-        ownerCheck.scanForOrphanChains( progressFactory );
-    }
-
     @Override
     protected void checkNode( RecordStore<NodeRecord> store, NodeRecord node,
                               RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> checker )

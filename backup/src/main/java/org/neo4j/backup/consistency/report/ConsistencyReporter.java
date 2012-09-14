@@ -78,17 +78,14 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
 
     private final ConsistencyLogger logger;
     private final DiffRecordAccess records;
-    private final ConsistencySummaryStatistics summary = new ConsistencySummaryStatistics();
+    private final ConsistencySummaryStatistics summary;
 
-    public ConsistencyReporter( ConsistencyLogger logger, DiffRecordAccess records )
+    public ConsistencyReporter( ConsistencyLogger logger, DiffRecordAccess records,
+                                ConsistencySummaryStatistics summary )
     {
         this.logger = logger;
         this.records = records;
-    }
-
-    public ConsistencySummaryStatistics getSummary()
-    {
-        return summary;
+        this.summary = summary;
     }
 
     private <RECORD extends AbstractBaseRecord, REPORT extends ConsistencyReport<RECORD, REPORT>>
