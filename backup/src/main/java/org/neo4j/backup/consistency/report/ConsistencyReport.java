@@ -355,6 +355,22 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
         @Documented
         @IncrementalOnly
         void changedForWrongOwner();
+
+        /** The string record referred from this property is also referred from a another property. */
+        @Documented
+        void stringMultipleOwners( PropertyRecord otherOwner );
+
+        /** The array record referred from this property is also referred from a another property. */
+        @Documented
+        void arrayMultipleOwners( PropertyRecord otherOwner );
+
+        /** The string record referred from this property is also referred from a another string record. */
+        @Documented
+        void stringMultipleOwners( DynamicRecord dynamic );
+
+        /** The array record referred from this property is also referred from a another array record. */
+        @Documented
+        void arrayMultipleOwners( DynamicRecord dynamic );
     }
 
     interface NameConsistencyReport<RECORD extends AbstractNameRecord, REPORT extends NameConsistencyReport<RECORD,REPORT>>
@@ -368,14 +384,24 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
         @Documented
         @Warning
         void emptyName( DynamicRecord name );
+
+        /** The string record referred from this name record is also referred from a another string record. */
+        @Documented
+        void nameMultipleOwners( DynamicRecord otherOwner );
     }
 
     interface LabelConsistencyReport extends NameConsistencyReport<RelationshipTypeRecord, LabelConsistencyReport>
     {
+        /** The string record referred from this label is also referred from a another label. */
+        @Documented
+        void nameMultipleOwners( RelationshipTypeRecord otherOwner );
     }
 
     interface PropertyKeyConsistencyReport extends NameConsistencyReport<PropertyIndexRecord, PropertyKeyConsistencyReport>
     {
+        /** The string record referred from this key is also referred from a another key. */
+        @Documented
+        void nameMultipleOwners( PropertyIndexRecord otherOwner );
     }
 
     interface DynamicConsistencyReport extends ConsistencyReport<DynamicRecord, DynamicConsistencyReport>
@@ -414,7 +440,22 @@ public interface ConsistencyReport<RECORD extends AbstractBaseRecord, REPORT ext
 
         /** The next block of this record is also referenced by another dynamic record. */
         @Documented
-        @IncrementalOnly
-        void multipleOwners( DynamicRecord otherOwner );
+        void nextMultipleOwners( DynamicRecord otherOwner );
+
+        /** The next block of this record is also referenced by a property record. */
+        @Documented
+        void nextMultipleOwners( PropertyRecord otherOwner );
+
+        /** The next block of this record is also referenced by a relationship label. */
+        @Documented
+        void nextMultipleOwners( RelationshipTypeRecord otherOwner );
+
+        /** The next block of this record is also referenced by a property key. */
+        @Documented
+        void nextMultipleOwners( PropertyIndexRecord otherOwner );
+
+        /** This record not referenced from any other dynamic block, or from any property or name record. */
+        @Documented
+        void orphanDynamicRecord();
     }
 }

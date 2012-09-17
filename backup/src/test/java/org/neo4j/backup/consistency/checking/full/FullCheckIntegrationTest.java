@@ -115,7 +115,7 @@ public class FullCheckIntegrationTest
                 NeoStoreRecord record = new NeoStoreRecord();
                 record.setNextProp( next.property() );
                 tx.update( record );
-                // We get exceptions when only the above happens...
+                // We get exceptions when only the above happens in a transaction...
                 tx.create( new NodeRecord( next.node(), -1, -1 ) );
             }
         } );

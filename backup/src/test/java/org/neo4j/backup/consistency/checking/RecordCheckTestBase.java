@@ -34,6 +34,7 @@ import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyType;
 import org.neo4j.kernel.impl.nioneo.store.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
+import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
 
 import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
@@ -135,14 +136,50 @@ public abstract class RecordCheckTestBase<RECORD extends AbstractBaseRecord,
         return new DynamicRecordCheck(store, dereference )
         {
             @Override
-            public void checkChange( DynamicRecord oldRecord, DynamicRecord newRecord,
-                                     ConsistencyReport.DynamicConsistencyReport report, DiffRecordAccess records )
+            public void check( DynamicRecord record, ConsistencyReport.DynamicConsistencyReport report,
+                               RecordAccess records )
             {
             }
 
             @Override
-            public void check( DynamicRecord record, ConsistencyReport.DynamicConsistencyReport report,
+            public void checkChange( DynamicRecord oldRecord, DynamicRecord newRecord,
+                                     ConsistencyReport.DynamicConsistencyReport report, DiffRecordAccess records )
+            {
+            }
+        };
+    }
+
+    public static RecordCheck<PropertyIndexRecord, ConsistencyReport.PropertyKeyConsistencyReport> dummyPropertyKeyCheck()
+    {
+        return new PropertyKeyRecordCheck()
+        {
+            @Override
+            public void check( PropertyIndexRecord record, ConsistencyReport.PropertyKeyConsistencyReport report,
                                RecordAccess records )
+            {
+            }
+
+            @Override
+            public void checkChange( PropertyIndexRecord oldRecord, PropertyIndexRecord newRecord,
+                                     ConsistencyReport.PropertyKeyConsistencyReport report, DiffRecordAccess records )
+            {
+            }
+        };
+    }
+
+    public static RecordCheck<RelationshipTypeRecord, ConsistencyReport.LabelConsistencyReport> dummyRelationshipLabelCheck()
+    {
+        return new RelationshipLabelRecordCheck()
+        {
+            @Override
+            public void check( RelationshipTypeRecord record, ConsistencyReport.LabelConsistencyReport report,
+                               RecordAccess records )
+            {
+            }
+
+            @Override
+            public void checkChange( RelationshipTypeRecord oldRecord, RelationshipTypeRecord newRecord,
+                                     ConsistencyReport.LabelConsistencyReport report, DiffRecordAccess records )
             {
             }
         };
@@ -229,7 +266,7 @@ public abstract class RecordCheckTestBase<RECORD extends AbstractBaseRecord,
         return propertyBlock( key, type, value.getId() );
     }
 
-    static PropertyBlock propertyBlock( PropertyIndexRecord key, PropertyType type, long value )
+    public static PropertyBlock propertyBlock( PropertyIndexRecord key, PropertyType type, long value )
     {
         PropertyBlock block = new PropertyBlock();
         block.setSingleBlock( key.getId() | (((long) type.intValue()) << 24) | (value << 28) );

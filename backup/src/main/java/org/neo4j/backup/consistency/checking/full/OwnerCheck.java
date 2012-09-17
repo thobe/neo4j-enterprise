@@ -213,8 +213,8 @@ class OwnerCheck implements CheckDecorator
                                 ConcurrentMap<Long, DynamicOwner> dynamicOwners = dynamics.get( type );
                                 if ( dynamicOwners != null )
                                 {
-                                    long id = block.getSingleValueBlock();
-                                    DynamicOwner.Property owner = new DynamicOwner.Property( record );
+                                    long id = block.getSingleValueLong();
+                                    DynamicOwner.Property owner = new DynamicOwner.Property( type, record );
                                     DynamicOwner prev = dynamicOwners.put( id, owner );
                                     if ( prev != null )
                                     {
@@ -293,7 +293,7 @@ class OwnerCheck implements CheckDecorator
     }
 
     RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport> decorateDynamicChecker(
-            RecordType type, final RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport> checker )
+            final RecordType type, final RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport> checker )
     {
         final ConcurrentMap<Long, DynamicOwner> dynamicOwners = dynamicOwners( type );
         if ( dynamicOwners == null )
@@ -313,6 +313,15 @@ class OwnerCheck implements CheckDecorator
                     if ( null == dynamicOwners.putIfAbsent( record.getId(), owner ) )
                     {
                         owner.markInCustody();
+                    }
+                    if ( !Record.NO_NEXT_BLOCK.is( record.getNextBlock() ) )
+                    {
+                        DynamicOwner.Dynamic nextOwner = new DynamicOwner.Dynamic( type, record );
+                        DynamicOwner prevOwner = dynamicOwners.put( record.getNextBlock(), nextOwner );
+                        if ( prevOwner != null )
+                        {
+                            report.forReference( prevOwner.record( records ), nextOwner );
+                        }
                     }
                 }
                 checker.check( record, report, records );

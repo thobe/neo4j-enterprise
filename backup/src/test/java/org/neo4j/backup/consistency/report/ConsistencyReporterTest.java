@@ -333,7 +333,7 @@ public class ConsistencyReporterTest
             @Override
             public boolean matchesSafely( String item )
             {
-                return item.trim().split( " " ).length > 0;
+                return item.trim().split( " " ).length > 1;
             }
 
             @Override

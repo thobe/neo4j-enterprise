@@ -34,77 +34,76 @@ class NodeRecordCheck extends PrimitiveRecordCheck<NodeRecord, ConsistencyReport
     }
 
     private enum NodeField implements RecordField<NodeRecord, ConsistencyReport.NodeConsistencyReport>,
-            ComparativeRecordChecker<NodeRecord, RelationshipRecord, ConsistencyReport.NodeConsistencyReport>
+                                      ComparativeRecordChecker<NodeRecord, RelationshipRecord, ConsistencyReport.NodeConsistencyReport>
     {
-        RELATIONSHIP
-        {
-            @Override
-            public void checkConsistency( NodeRecord node, ConsistencyReport.NodeConsistencyReport report,
-                                          RecordAccess records )
-            {
-                if ( !Record.NO_NEXT_RELATIONSHIP.is( node.getNextRel() ) )
-                {
-                    report.forReference( records.relationship( node.getNextRel() ), this );
-                }
-            }
+        RELATIONSHIP;
 
-            @Override
-            public void checkReference( NodeRecord node, RelationshipRecord relationship,
-                                        ConsistencyReport.NodeConsistencyReport report, RecordAccess records )
+        @Override
+        public void checkConsistency( NodeRecord node, ConsistencyReport.NodeConsistencyReport report,
+                                      RecordAccess records )
+        {
+            if ( !Record.NO_NEXT_RELATIONSHIP.is( node.getNextRel() ) )
             {
-                if ( !relationship.inUse() )
+                report.forReference( records.relationship( node.getNextRel() ), this );
+            }
+        }
+
+        @Override
+        public void checkReference( NodeRecord node, RelationshipRecord relationship,
+                                    ConsistencyReport.NodeConsistencyReport report, RecordAccess records )
+        {
+            if ( !relationship.inUse() )
+            {
+                report.relationshipNotInUse( relationship );
+            }
+            else
+            {
+                RelationshipNodeField selectedField = RelationshipNodeField.select( relationship, node );
+                if ( selectedField == null )
                 {
-                    report.relationshipNotInUse( relationship );
+                    report.relationshipForOtherNode( relationship );
                 }
                 else
                 {
-                    RelationshipNodeField selectedField = RelationshipNodeField.select( relationship, node );
-                    if ( selectedField == null )
-                    {
-                        report.relationshipForOtherNode( relationship );
+                    RelationshipNodeField[] fields;
+                    if ( relationship.getFirstNode() == relationship.getSecondNode() )
+                    { // this relationship is a loop, report both inconsistencies
+                        fields = RelationshipNodeField.values();
                     }
                     else
                     {
-                        RelationshipNodeField[] fields;
-                        if ( relationship.getFirstNode() == relationship.getSecondNode() )
-                        { // this relationship is a loop, report both inconsistencies
-                            fields = RelationshipNodeField.values();
-                        }
-                        else
-                        {
-                            fields = new RelationshipNodeField[]{selectedField};
-                        }
-                        for ( RelationshipNodeField field : fields )
-                        {
-                            if ( !Record.NO_NEXT_RELATIONSHIP.is( field.prev( relationship ) ) )
-                            {
-                                field.notFirstInChain( report, relationship );
-                            }
-                        }
+                        fields = new RelationshipNodeField[]{selectedField};
                     }
-                }
-            }
-
-            @Override
-            public void checkChange( NodeRecord oldRecord, NodeRecord newRecord,
-                                     ConsistencyReport.NodeConsistencyReport report,
-                                     DiffRecordAccess records )
-            {
-                if ( !newRecord.inUse() || valueFrom( oldRecord ) != valueFrom( newRecord ) )
-                {
-                    if ( !Record.NO_NEXT_RELATIONSHIP.is( valueFrom( oldRecord ) )
-                         && records.changedRelationship( valueFrom( oldRecord ) ) == null )
+                    for ( RelationshipNodeField field : fields )
                     {
-                        report.relationshipNotUpdated();
+                        if ( !Record.NO_NEXT_RELATIONSHIP.is( field.prev( relationship ) ) )
+                        {
+                            field.notFirstInChain( report, relationship );
+                        }
                     }
                 }
             }
+        }
 
-            @Override
-            public long valueFrom( NodeRecord record )
+        @Override
+        public void checkChange( NodeRecord oldRecord, NodeRecord newRecord,
+                                 ConsistencyReport.NodeConsistencyReport report,
+                                 DiffRecordAccess records )
+        {
+            if ( !newRecord.inUse() || valueFrom( oldRecord ) != valueFrom( newRecord ) )
             {
-                return record.getNextRel();
+                if ( !Record.NO_NEXT_RELATIONSHIP.is( valueFrom( oldRecord ) )
+                     && records.changedRelationship( valueFrom( oldRecord ) ) == null )
+                {
+                    report.relationshipNotUpdated();
+                }
             }
+        }
+
+        @Override
+        public long valueFrom( NodeRecord record )
+        {
+            return record.getNextRel();
         }
     }
 }
