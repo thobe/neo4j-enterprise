@@ -95,7 +95,6 @@ public class DataGeneratorTest
             @Override
             public boolean matchesSafely( Map<String, Object> item )
             {
-                System.out.println( "item.size() = " + item.size() + " expected " + size );
                 return item.size() == size;
             }
 

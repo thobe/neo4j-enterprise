@@ -29,8 +29,8 @@ import java.util.Map;
 
 import javax.transaction.xa.Xid;
 
-import org.neo4j.backup.consistency.checking.full.ConsistencyCheckIncompleteException;
-import org.neo4j.backup.consistency.checking.full.FullCheck;
+import org.neo4j.consistency.checking.full.ConsistencyCheckIncompleteException;
+import org.neo4j.consistency.checking.full.FullCheck;
 import org.neo4j.helpers.Args;
 import org.neo4j.helpers.ProgressIndicator;
 import org.neo4j.helpers.progress.ProgressMonitorFactory;

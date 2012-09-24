@@ -22,12 +22,12 @@ package org.neo4j.backup.log;
 import java.io.File;
 import java.util.Map;
 
-import org.neo4j.backup.consistency.checking.old.ConsistencyRecordProcessor;
-import org.neo4j.backup.consistency.checking.old.ConsistencyReporter;
-import org.neo4j.backup.consistency.checking.old.InconsistencyType;
-import org.neo4j.backup.consistency.checking.old.MonitoringConsistencyReporter;
-import org.neo4j.backup.consistency.store.DiffRecordStore;
-import org.neo4j.backup.consistency.store.DiffStore;
+import org.neo4j.consistency.checking.old.ConsistencyRecordProcessor;
+import org.neo4j.consistency.checking.old.ConsistencyReporter;
+import org.neo4j.consistency.checking.old.InconsistencyType;
+import org.neo4j.consistency.checking.old.MonitoringConsistencyReporter;
+import org.neo4j.consistency.store.DiffRecordStore;
+import org.neo4j.consistency.store.DiffStore;
 import org.neo4j.helpers.collection.Visitor;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.DataInconsistencyError;

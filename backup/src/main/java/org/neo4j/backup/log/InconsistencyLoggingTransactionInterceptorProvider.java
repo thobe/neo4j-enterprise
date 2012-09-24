@@ -19,58 +19,12 @@
  */
 package org.neo4j.backup.log;
 
-import org.neo4j.backup.consistency.checking.incremental.DiffCheck;
-import org.neo4j.backup.consistency.checking.incremental.FullDiffCheck;
-import org.neo4j.backup.consistency.checking.incremental.IncrementalDiffCheck;
-import org.neo4j.backup.consistency.checking.incremental.LoggingDiffCheck;
 import org.neo4j.helpers.Service;
 import org.neo4j.kernel.impl.transaction.xaframework.TransactionInterceptorProvider;
-import org.neo4j.kernel.impl.util.StringLogger;
 
 @Service.Implementation(TransactionInterceptorProvider.class)
-public class InconsistencyLoggingTransactionInterceptorProvider extends CheckingTransactionInterceptorProvider
+@Deprecated
+public class InconsistencyLoggingTransactionInterceptorProvider
+        extends org.neo4j.consistency.checking.incremental.intercept.InconsistencyLoggingTransactionInterceptorProvider
 {
-    public static final String NAME = "inconsistency" + "log";
-
-    public InconsistencyLoggingTransactionInterceptorProvider()
-    {
-        super( NAME );
-    }
-
-    public enum CheckerMode
-    {
-        FULL
-        {
-            @Override
-            DiffCheck createChecker( StringLogger logger )
-            {
-                return new FullDiffCheck( logger );
-            }
-        },
-        DIFF
-        {
-            @Override
-            DiffCheck createChecker( StringLogger logger )
-            {
-                return new IncrementalDiffCheck( logger );
-            }
-        };
-
-        abstract DiffCheck createChecker( StringLogger logger );
-    }
-
-    @Override
-    DiffCheck createChecker( String mode, StringLogger logger )
-    {
-        final CheckerMode checkerMode;
-        try
-        {
-            checkerMode = CheckerMode.valueOf( mode.toUpperCase() );
-        }
-        catch ( Exception e )
-        {
-            return null;
-        }
-        return new LoggingDiffCheck( checkerMode.createChecker( logger ), logger );
-    }
 }

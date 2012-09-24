@@ -19,9 +19,9 @@
  */
 package org.neo4j.backup.check;
 
-import org.neo4j.backup.consistency.Check;
+import org.neo4j.consistency.Check;
 
-/** @deprecated use {@link org.neo4j.backup.consistency.Check} instead. */
+/** @deprecated use {@link org.neo4j.consistency.Check} instead. */
 @Deprecated
 class ConsistencyCheck
 {

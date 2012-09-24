@@ -27,8 +27,8 @@ import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.kernel.configuration.ConfigParam;
 import org.neo4j.kernel.impl.transaction.xaframework.TransactionInterceptorProvider;
 
-import static org.neo4j.backup.log.InconsistencyLoggingTransactionInterceptorProvider.CheckerMode.DIFF;
-import static org.neo4j.backup.log.InconsistencyLoggingTransactionInterceptorProvider.CheckerMode.FULL;
+import static org.neo4j.consistency.checking.incremental.intercept.InconsistencyLoggingTransactionInterceptorProvider.CheckerMode.DIFF;
+import static org.neo4j.consistency.checking.incremental.intercept.InconsistencyLoggingTransactionInterceptorProvider.CheckerMode.FULL;
 
 enum VerificationLevel implements ConfigParam
 {
