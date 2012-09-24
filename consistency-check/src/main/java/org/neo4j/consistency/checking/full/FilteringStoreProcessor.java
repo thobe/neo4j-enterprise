@@ -20,132 +20,134 @@
 package org.neo4j.consistency.checking.full;
 
 import org.neo4j.consistency.checking.CheckDecorator;
+import org.neo4j.consistency.report.ConsistencyLogger;
 import org.neo4j.consistency.report.ConsistencyReporter;
 import org.neo4j.consistency.report.ConsistencySummaryStatistics;
-import org.neo4j.consistency.report.MessageConsistencyLogger;
 import org.neo4j.consistency.store.DiffRecordAccess;
 import org.neo4j.consistency.store.RecordReference;
 import org.neo4j.consistency.store.SkippingRecordAccess;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
+import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
+import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
 
 enum FilteringStoreProcessor
 {
     EVERYTHING
-    {
-        @Override
-        DiffRecordAccess filter( final DiffRecordAccess recordAccess )
-        {
-            return recordAccess;
-        }
-    },
+            {
+                @Override
+                DiffRecordAccess filter( DiffRecordAccess recordAccess )
+                {
+                    return recordAccess;
+                }
+            },
     PROPERTIES_ONLY
-    {
-        @Override
-        DiffRecordAccess filter( final DiffRecordAccess recordAccess )
-        {
-            return new SkippingRecordAccess()
             {
                 @Override
-                public RecordReference<PropertyRecord> property( long id )
+                DiffRecordAccess filter( DiffRecordAccess recordAccess )
                 {
-                    return recordAccess.property( id );
+                    return new SkipAllButCached( recordAccess )
+                    {
+                        @Override
+                        public RecordReference<PropertyRecord> property( long id )
+                        {
+                            return recordAccess.property( id );
+                        }
+                    };
                 }
-            };
-        }
-    },
+            },
     RELATIONSHIPS_ONLY
-    {
-        @Override
-        DiffRecordAccess filter( final DiffRecordAccess recordAccess )
-        {
-            return new SkippingRecordAccess()
             {
                 @Override
-                public RecordReference<RelationshipRecord> relationship( long id )
+                DiffRecordAccess filter( DiffRecordAccess recordAccess )
                 {
-                    return recordAccess.relationship( id );
+                    return new SkipAllButCached( recordAccess )
+                    {
+                        @Override
+                        public RecordReference<RelationshipRecord> relationship( long id )
+                        {
+                            return recordAccess.relationship( id );
+                        }
+                    };
                 }
-            };
-        }
-    },
+            },
     NODES_ONLY
-    {
-        @Override
-        DiffRecordAccess filter( final DiffRecordAccess recordAccess )
-        {
-            return new SkippingRecordAccess()
             {
                 @Override
-                public RecordReference<NodeRecord> node( long id )
+                DiffRecordAccess filter( DiffRecordAccess recordAccess )
                 {
-                    return recordAccess.node( id );
+                    return new SkipAllButCached( recordAccess )
+                    {
+                        @Override
+                        public RecordReference<NodeRecord> node( long id )
+                        {
+                            return recordAccess.node( id );
+                        }
+                    };
                 }
-            };
-        }
-    },
+            },
     STRINGS_ONLY
-    {
-        @Override
-        DiffRecordAccess filter( final DiffRecordAccess recordAccess )
-        {
-            return new SkippingRecordAccess()
             {
                 @Override
-                public RecordReference<DynamicRecord> string( long id )
+                DiffRecordAccess filter( DiffRecordAccess recordAccess )
                 {
-                    return recordAccess.string( id );
+                    return new SkipAllButCached( recordAccess )
+                    {
+                        @Override
+                        public RecordReference<DynamicRecord> string( long id )
+                        {
+                            return recordAccess.string( id );
+                        }
+                    };
                 }
-            };
-        }
-    }, 
+            },
     ARRAYS_ONLY
-    {
-        @Override
-        DiffRecordAccess filter( final DiffRecordAccess recordAccess )
-        {
-            return new SkippingRecordAccess()
             {
                 @Override
-                public RecordReference<DynamicRecord> array( long id )
+                DiffRecordAccess filter( DiffRecordAccess recordAccess )
                 {
-                    return recordAccess.array( id );
+                    return new SkipAllButCached( recordAccess )
+                    {
+                        @Override
+                        public RecordReference<DynamicRecord> array( long id )
+                        {
+                            return recordAccess.array( id );
+                        }
+                    };
                 }
-            };
-        }
-    },
+            },
     DYNAMIC_PROPERTIES_ONLY
-    {
-        @Override
-        DiffRecordAccess filter( final DiffRecordAccess recordAccess )
-        {
-            return new SkippingRecordAccess()
             {
                 @Override
-                public RecordReference<DynamicRecord> string( long id )
+                DiffRecordAccess filter( DiffRecordAccess recordAccess )
                 {
-                    return recordAccess.string( id );
-                }
+                    return new SkipAllButCached( recordAccess )
+                    {
+                        @Override
+                        public RecordReference<DynamicRecord> string( long id )
+                        {
+                            return recordAccess.string( id );
+                        }
 
-                @Override
-                public RecordReference<DynamicRecord> array( long id )
-                {
-                    return recordAccess.array( id );
+                        @Override
+                        public RecordReference<DynamicRecord> array( long id )
+                        {
+                            return recordAccess.array( id );
+                        }
+                    };
                 }
             };
-        }
-    };
 
     static class Factory
     {
         private final CheckDecorator decorator;
-        private final MessageConsistencyLogger logger;
+        private final ConsistencyLogger logger;
         private final DiffRecordAccess recordAccess;
         private final ConsistencySummaryStatistics summary;
 
-        Factory( CheckDecorator decorator, MessageConsistencyLogger logger,
+        Factory( CheckDecorator decorator, ConsistencyLogger logger,
                  DiffRecordAccess recordAccess, ConsistencySummaryStatistics summary )
         {
 
@@ -173,4 +175,26 @@ enum FilteringStoreProcessor
     }
 
     abstract DiffRecordAccess filter( DiffRecordAccess recordAccess );
+
+    private static class SkipAllButCached extends SkippingRecordAccess
+    {
+        final DiffRecordAccess recordAccess;
+
+        private SkipAllButCached( DiffRecordAccess recordAccess )
+        {
+            this.recordAccess = recordAccess;
+        }
+
+        @Override
+        public RecordReference<PropertyIndexRecord> propertyKey( int id )
+        {
+            return recordAccess.propertyKey( id );
+        }
+
+        @Override
+        public RecordReference<RelationshipTypeRecord> relationshipLabel( int id )
+        {
+            return recordAccess.relationshipLabel( id );
+        }
+    }
 }

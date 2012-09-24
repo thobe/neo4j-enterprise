@@ -27,6 +27,8 @@ import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 
+import static org.neo4j.consistency.store.RecordReference.SkippingReference.skipReference;
+
 abstract class PropertyOwner<RECORD extends PrimitiveRecord> implements Owner
 {
     abstract RecordReference<RECORD> record( RecordAccess records );
@@ -88,7 +90,7 @@ abstract class PropertyOwner<RECORD extends PrimitiveRecord> implements Owner
             // that means that it isn't an orphan, so we skip this orphan check
             // and return a record for conflict check that always is ok (by skipping the check)
             this.markInCustody();
-            return SKIP;
+            return skipReference();
         }
 
         @Override
@@ -121,15 +123,6 @@ abstract class PropertyOwner<RECORD extends PrimitiveRecord> implements Owner
             this.reporter = reporter;
         }
     }
-
-    private static final RecordReference<PrimitiveRecord> SKIP = new RecordReference<PrimitiveRecord>()
-    {
-        @Override
-        public void dispatch( PendingReferenceCheck<PrimitiveRecord> reporter )
-        {
-            reporter.skip();
-        }
-    };
 
     private PropertyOwner()
     {

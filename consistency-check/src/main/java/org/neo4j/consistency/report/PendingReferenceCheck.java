@@ -34,6 +34,17 @@ public class PendingReferenceCheck<REFERENCED extends AbstractBaseRecord>
         this.checker = checker;
     }
 
+    @Override
+    public synchronized String toString()
+    {
+        if (report == null)
+        {
+            return String.format( "CompletedReferenceCheck{%s}", checker );
+        } else {
+            return ConsistencyReporter.pendingCheckToString(report, checker);
+        }
+    }
+
     public void checkReference( REFERENCED referenced, RecordAccess records )
     {
         ConsistencyReporter.dispatchReference( report(), checker, referenced, records );

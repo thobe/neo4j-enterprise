@@ -303,6 +303,12 @@ class PropertyRecordCheck
                     report.keyNotInUse( block, referred );
                 }
             }
+
+            @Override
+            public String toString()
+            {
+                return "PROPERTY_KEY";
+            }
         };
     }
 

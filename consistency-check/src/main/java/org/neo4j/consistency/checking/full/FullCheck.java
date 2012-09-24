@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.neo4j.consistency.checking.CheckDecorator;
+import org.neo4j.consistency.report.ConsistencyLogger;
 import org.neo4j.consistency.report.ConsistencySummaryStatistics;
 import org.neo4j.consistency.report.MessageConsistencyLogger;
 import org.neo4j.consistency.store.CacheSmallStoresRecordAccess;
@@ -108,8 +109,8 @@ public class FullCheck
         return summary;
     }
 
-    private void execute( StoreAccess store, CheckDecorator decorator, DiffRecordAccess recordAccess,
-                          MessageConsistencyLogger logger, ConsistencySummaryStatistics summary )
+    void execute( StoreAccess store, CheckDecorator decorator, DiffRecordAccess recordAccess,
+                  ConsistencyLogger logger, ConsistencySummaryStatistics summary )
             throws ConsistencyCheckIncompleteException
     {
         FilteringStoreProcessor.Factory processorFactory = new FilteringStoreProcessor.Factory(
@@ -185,7 +186,7 @@ public class FullCheck
         }
     }
 
-    private DiffRecordAccess recordAccess( StoreAccess store )
+    static DiffRecordAccess recordAccess( StoreAccess store )
     {
         return new CacheSmallStoresRecordAccess(
                 new DirectRecordAccess( store ),

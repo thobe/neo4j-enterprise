@@ -27,7 +27,7 @@ import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
 import static org.mockito.Mockito.verify;
 
 public class PropertyKeyRecordCheckTest extends
-        RecordCheckTestBase<PropertyIndexRecord, ConsistencyReport.PropertyKeyConsistencyReport, PropertyKeyRecordCheck>
+                                        RecordCheckTestBase<PropertyIndexRecord, ConsistencyReport.PropertyKeyConsistencyReport, PropertyKeyRecordCheck>
 {
     public PropertyKeyRecordCheckTest()
     {
@@ -89,6 +89,42 @@ public class PropertyKeyRecordCheckTest extends
 
         // then
         verify( report ).emptyName( name );
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    // change checking
+
+    @Test
+    public void shouldNotReportAnythingForConsistentlyChangedRecord() throws Exception
+    {
+        // given
+        PropertyIndexRecord oldRecord = notInUse( new PropertyIndexRecord( 42 ) );
+        PropertyIndexRecord newRecord = inUse( new PropertyIndexRecord( 42 ) );
+        DynamicRecord name = addKeyName( inUse( new DynamicRecord( 6 ) ) );
+        name.setData( new byte[1] );
+        newRecord.setNameId( (int) name.getId() );
+
+        // when
+        ConsistencyReport.PropertyKeyConsistencyReport report = checkChange( oldRecord, newRecord );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportProblemsWithTheNewStateWhenCheckingChanges() throws Exception
+    {
+        // given
+        PropertyIndexRecord oldRecord = notInUse( new PropertyIndexRecord( 42 ) );
+        PropertyIndexRecord newRecord = inUse( new PropertyIndexRecord( 42 ) );
+        DynamicRecord name = addKeyName( notInUse( new DynamicRecord( 6 ) ) );
+        newRecord.setNameId( (int) name.getId() );
+
+        // when
+        ConsistencyReport.PropertyKeyConsistencyReport report = checkChange( oldRecord, newRecord );
+
+        // then
+        verify( report ).nameBlockNotInUse( name );
         verifyOnlyReferenceDispatch( report );
     }
 }

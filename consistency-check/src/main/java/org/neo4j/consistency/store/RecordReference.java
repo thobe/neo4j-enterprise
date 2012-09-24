@@ -25,4 +25,32 @@ import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 public interface RecordReference<RECORD extends AbstractBaseRecord>
 {
     void dispatch( PendingReferenceCheck<RECORD> reporter );
+
+    class SkippingReference<RECORD extends AbstractBaseRecord> implements RecordReference<RECORD>
+    {
+        @SuppressWarnings("unchecked")
+        public static <RECORD extends AbstractBaseRecord> SkippingReference<RECORD> skipReference()
+        {
+            return INSTANCE;
+        }
+
+        @Override
+        public void dispatch( PendingReferenceCheck<RECORD> reporter )
+        {
+            reporter.skip();
+        }
+
+        @Override
+        public String toString()
+        {
+            return "SkipReference";
+        }
+
+        private static final SkippingReference INSTANCE = new SkippingReference();
+
+        private SkippingReference()
+        {
+            // singleton
+        }
+    }
 }

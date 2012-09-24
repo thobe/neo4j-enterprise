@@ -32,6 +32,8 @@ import org.neo4j.kernel.impl.nioneo.store.PropertyIndexRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeRecord;
 
+import static org.neo4j.consistency.store.RecordReference.SkippingReference.skipReference;
+
 abstract class DynamicOwner<RECORD extends AbstractBaseRecord> implements Owner
 {
     static final ComparativeRecordChecker<DynamicRecord, AbstractBaseRecord, ConsistencyReport.DynamicConsistencyReport>
@@ -127,7 +129,7 @@ abstract class DynamicOwner<RECORD extends AbstractBaseRecord> implements Owner
             case RELATIONSHIP_LABEL_NAME:
                 return records.relationshipLabelName( (int)id );
             default:
-                return (RecordReference)SKIP;
+                return skipReference();
             }
         }
 
@@ -221,7 +223,7 @@ abstract class DynamicOwner<RECORD extends AbstractBaseRecord> implements Owner
             // that means that it isn't an orphan, so we skip this orphan check
             // and return a record for conflict check that always is ok (by skipping the check)
             this.markInCustody();
-            return SKIP;
+            return skipReference();
         }
 
         public void checkOrphanage()
@@ -260,15 +262,6 @@ abstract class DynamicOwner<RECORD extends AbstractBaseRecord> implements Owner
             this.reporter = reporter;
         }
     }
-
-    private static final RecordReference<AbstractBaseRecord> SKIP = new RecordReference<AbstractBaseRecord>()
-    {
-        @Override
-        public void dispatch( PendingReferenceCheck<AbstractBaseRecord> reporter )
-        {
-            reporter.skip();
-        }
-    };
 
     private DynamicOwner()
     {

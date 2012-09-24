@@ -113,6 +113,12 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
         handler.updateSummary();
     }
 
+    static String pendingCheckToString(ConsistencyReport report,ComparativeRecordChecker checker)
+    {
+        ReportInvocationHandler handler = (ReportInvocationHandler) getInvocationHandler( report );
+        return handler.pendingCheckToString(checker);
+    }
+
     static void dispatchChangeReference( ConsistencyReport report, ComparativeRecordChecker checker,
                                          AbstractBaseRecord oldReferenced, AbstractBaseRecord newReferenced,
                                          RecordAccess records )
@@ -146,6 +152,33 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
                 sink.updateSummary( type, errors, warnings );
             }
         }
+
+        String pendingCheckToString( ComparativeRecordChecker checker )
+        {
+            String checkName;
+            try
+            {
+                if ( checker.getClass().getMethod( "toString" ).getDeclaringClass() == Object.class )
+                {
+                    checkName = checker.getClass().getSimpleName();
+                    if ( checkName.length() == 0 )
+                    {
+                        checkName = checker.getClass().getName();
+                    }
+                }
+                else
+                {
+                    checkName = checker.toString();
+                }
+            }
+            catch ( NoSuchMethodException e )
+            {
+                checkName = checker.toString();
+            }
+            return String.format( "ReferenceCheck{%s[%s]/%s}", type, recordId(), checkName );
+        }
+
+        abstract long recordId();
 
         /**
          * Invoked when an inconsistency is encountered.
@@ -226,6 +259,12 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
         }
 
         @Override
+        long recordId()
+        {
+            return record.getLongId();
+        }
+
+        @Override
         protected void logError( String message, Object[] args )
         {
             sink.error( type, record, message, args );
@@ -266,6 +305,12 @@ public class ConsistencyReporter implements ConsistencyReport.Reporter
             super( logger, summary, type );
             this.oldRecord = oldRecord;
             this.newRecord = newRecord;
+        }
+
+        @Override
+        long recordId()
+        {
+            return newRecord.getLongId();
         }
 
         @Override

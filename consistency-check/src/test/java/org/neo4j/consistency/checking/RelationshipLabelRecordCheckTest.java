@@ -91,4 +91,40 @@ public class RelationshipLabelRecordCheckTest extends
         verify( report ).emptyName( name );
         verifyOnlyReferenceDispatch( report );
     }
+
+    // change checking
+
+    @Test
+    public void shouldNotReportAnythingForConsistentlyChangedRecord() throws Exception
+    {
+        // given
+        RelationshipTypeRecord oldRecord = notInUse( new RelationshipTypeRecord( 42 ) );
+        RelationshipTypeRecord newRecord = inUse( new RelationshipTypeRecord( 42 ) );
+        DynamicRecord name = addLabelName( inUse( new DynamicRecord( 6 ) ) );
+        name.setData( new byte[1] );
+        newRecord.setNameId( (int) name.getId()  );
+
+        // when
+        ConsistencyReport.LabelConsistencyReport report = checkChange( oldRecord, newRecord );
+
+        // then
+        verifyOnlyReferenceDispatch( report );
+    }
+
+    @Test
+    public void shouldReportProblemsWithTheNewStateWhenCheckingChanges() throws Exception
+    {
+        // given
+        RelationshipTypeRecord oldRecord = notInUse( new RelationshipTypeRecord( 42 ) );
+        RelationshipTypeRecord newRecord = inUse( new RelationshipTypeRecord( 42 ) );
+        DynamicRecord name = addLabelName( notInUse( new DynamicRecord( 6 ) ) );
+        newRecord.setNameId( (int) name.getId()  );
+
+        // when
+        ConsistencyReport.LabelConsistencyReport report = checkChange( oldRecord, newRecord );
+
+        // then
+        verify( report ).nameBlockNotInUse( name );
+        verifyOnlyReferenceDispatch( report );
+    }
 }
