@@ -25,7 +25,7 @@ import java.util.Map;
 
 import org.neo4j.kernel.impl.nioneo.store.Abstract64BitRecord;
 
-class RecordSet<R extends Abstract64BitRecord> implements Iterable<R>
+public class RecordSet<R extends Abstract64BitRecord> implements Iterable<R>
 {
     private Map<Long, R> map = new HashMap<Long, R>();
 
@@ -71,6 +71,12 @@ class RecordSet<R extends Abstract64BitRecord> implements Iterable<R>
             }
         }
         return true;
+    }
+
+    @Override
+    public boolean equals( Object obj )
+    {
+        return obj instanceof RecordSet && this.map.equals( ((RecordSet)obj).map );
     }
 
     @Override

@@ -45,6 +45,6 @@ public enum RelationshipChainDirection
         {
             return second;
         }
-        throw new IllegalArgumentException( String.format( "%d does not reference node %d", rel, nodeId ) );
+        throw new IllegalArgumentException( String.format( "%s does not reference node %d", rel, nodeId ) );
     }
 }

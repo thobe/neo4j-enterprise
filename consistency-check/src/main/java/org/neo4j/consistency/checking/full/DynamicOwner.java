@@ -261,6 +261,12 @@ abstract class DynamicOwner<RECORD extends AbstractBaseRecord> implements Owner
         {
             this.reporter = reporter;
         }
+
+        @Override
+        public AbstractBaseRecord forceLoad()
+        {
+            throw new UnsupportedOperationException( "Can only capture PendingReferenceCheck" );
+        }
     }
 
     private DynamicOwner()

@@ -26,6 +26,8 @@ public interface RecordReference<RECORD extends AbstractBaseRecord>
 {
     void dispatch( PendingReferenceCheck<RECORD> reporter );
 
+    RECORD forceLoad();
+
     class SkippingReference<RECORD extends AbstractBaseRecord> implements RecordReference<RECORD>
     {
         @SuppressWarnings("unchecked")
@@ -38,6 +40,12 @@ public interface RecordReference<RECORD extends AbstractBaseRecord>
         public void dispatch( PendingReferenceCheck<RECORD> reporter )
         {
             reporter.skip();
+        }
+
+        @Override
+        public RECORD forceLoad()
+        {
+            throw new UnsupportedOperationException( "Skipped reference." );
         }
 
         @Override

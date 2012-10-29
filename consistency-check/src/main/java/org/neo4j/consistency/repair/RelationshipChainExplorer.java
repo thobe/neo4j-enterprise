@@ -19,8 +19,8 @@
  */
 package org.neo4j.consistency.repair;
 
+import org.neo4j.consistency.store.RecordAccess;
 import org.neo4j.kernel.impl.nioneo.store.Record;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 
 import static org.neo4j.consistency.repair.RelationshipChainDirection.NEXT;
@@ -29,11 +29,11 @@ import static org.neo4j.consistency.repair.RelationshipChainDirection.PREV;
 public class RelationshipChainExplorer
 {
     public static final int none = Record.NO_NEXT_RELATIONSHIP.intValue();
-    private final RecordStore<RelationshipRecord> recordStore;
+    private final RecordAccess recordAccess;
 
-    public RelationshipChainExplorer( RecordStore<RelationshipRecord> recordStore )
+    public RelationshipChainExplorer( RecordAccess recordAccess )
     {
-        this.recordStore = recordStore;
+        this.recordAccess = recordAccess;
     }
 
     public RecordSet<RelationshipRecord> exploreRelationshipRecordChainsToDepthTwo( RelationshipRecord record )
@@ -65,7 +65,7 @@ public class RelationshipChainExplorer
 
     protected RecordSet<RelationshipRecord> followChainFromNode(long nodeId, long relationshipId )
     {
-        RelationshipRecord record = recordStore.getRecord( relationshipId );
+        RelationshipRecord record = recordAccess.relationship( relationshipId ).forceLoad();
         return expandChain( record, nodeId, NEXT );
     }
 
@@ -78,7 +78,7 @@ public class RelationshipChainExplorer
         long nextRelId;
         while ( currentRecord.inUse() &&
                 (nextRelId = direction.fieldFor( nodeId, currentRecord ).relOf( currentRecord )) != none ) {
-            currentRecord = recordStore.forceGetRecord( nextRelId );
+            currentRecord = recordAccess.relationship( nextRelId ).forceLoad();
             chain.add( currentRecord );
         }
         return chain;

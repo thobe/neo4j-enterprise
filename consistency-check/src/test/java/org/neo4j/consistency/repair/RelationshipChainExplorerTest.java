@@ -23,6 +23,7 @@ import java.io.File;
 
 import org.junit.Rule;
 import org.junit.Test;
+import org.neo4j.consistency.store.DirectRecordAccess;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.RelationshipType;
 import org.neo4j.graphdb.Transaction;
@@ -51,7 +52,7 @@ public class RelationshipChainExplorerTest
 
         // when
         int relationshipIdInMiddleOfChain = 10;
-        RecordSet<RelationshipRecord> records = new RelationshipChainExplorer( relationshipStore )
+        RecordSet<RelationshipRecord> records = new RelationshipChainExplorer( new DirectRecordAccess( store ) )
                 .exploreRelationshipRecordChainsToDepthTwo(
                         relationshipStore.getRecord( relationshipIdInMiddleOfChain ) );
 
@@ -70,7 +71,7 @@ public class RelationshipChainExplorerTest
 
         // when
         int relationshipIdInMiddleOfChain = 10;
-        RecordSet<RelationshipRecord> records = new RelationshipChainExplorer( relationshipStore )
+        RecordSet<RelationshipRecord> records = new RelationshipChainExplorer( new DirectRecordAccess( store ) )
                 .exploreRelationshipRecordChainsToDepthTwo(
                         relationshipStore.getRecord( relationshipIdInMiddleOfChain ) );
 

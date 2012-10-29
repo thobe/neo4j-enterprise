@@ -17,36 +17,11 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.consistency.store;
+package org.neo4j.consistency.repair.tool;
 
-import org.neo4j.consistency.report.PendingReferenceCheck;
-import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
+import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 
-public class DirectRecordReference<RECORD extends AbstractBaseRecord> implements RecordReference<RECORD>
+public interface RecordRemover
 {
-    private final RECORD record;
-    private final RecordAccess records;
-
-    DirectRecordReference( RECORD record, RecordAccess records )
-    {
-        this.record = record;
-        this.records = records;
-    }
-
-    @Override
-    public void dispatch( PendingReferenceCheck<RECORD> reporter )
-    {
-        reporter.checkReference( record, records );
-    }
-
-    @Override
-    public RECORD forceLoad()
-    {
-        return record();
-    }
-
-    public RECORD record()
-    {
-        return record;
-    }
+    void remove(RelationshipRecord record);
 }

@@ -122,6 +122,12 @@ abstract class PropertyOwner<RECORD extends PrimitiveRecord> implements Owner
         {
             this.reporter = reporter;
         }
+
+        @Override
+        public PrimitiveRecord forceLoad()
+        {
+            throw new UnsupportedOperationException( "Can only capture PendingReferenceCheck" );
+        }
     }
 
     private PropertyOwner()

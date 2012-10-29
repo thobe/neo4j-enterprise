@@ -306,6 +306,12 @@ public class ExecutionOrderIntegrationTest
                                       withSettings().spiedInstance( reporter )
                                               .defaultAnswer( new ReporterSpy<T>( reference, reporter, log ) ) ) );
         }
+
+        @Override
+        public T forceLoad()
+        {
+            return reference.forceLoad();
+        }
     }
 
     private static class ReporterSpy<T extends AbstractBaseRecord> implements Answer<Object>
