@@ -42,7 +42,7 @@ public class RecordSet<R extends Abstract64BitRecord> implements Iterable<R>
         return set;
     }
 
-    int size()
+    public int size()
     {
         return map.size();
     }
