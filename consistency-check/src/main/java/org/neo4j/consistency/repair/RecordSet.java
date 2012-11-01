@@ -29,7 +29,7 @@ public class RecordSet<R extends Abstract64BitRecord> implements Iterable<R>
 {
     private Map<Long, R> map = new HashMap<Long, R>();
 
-    void add( R record )
+    public void add( R record )
     {
         map.put( record.getId(), record );
     }

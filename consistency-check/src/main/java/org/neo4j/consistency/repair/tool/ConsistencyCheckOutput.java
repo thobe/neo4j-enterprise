@@ -26,18 +26,9 @@ import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 
 public class ConsistencyCheckOutput
 {
-    private RecordSet<NodeRecord> nodeRecords;
-    private RecordSet<RelationshipRecord> relationshipRecords;
-    private RecordSet<PropertyRecord> propertyRecords;
-
-    public ConsistencyCheckOutput( RecordSet<NodeRecord> nodeRecords,
-                                   RecordSet<RelationshipRecord> relationshipRecords,
-                                   RecordSet<PropertyRecord> propertyRecords )
-    {
-        this.nodeRecords = nodeRecords;
-        this.relationshipRecords = relationshipRecords;
-        this.propertyRecords = propertyRecords;
-    }
+    private final RecordSet<NodeRecord> nodeRecords = new RecordSet<NodeRecord>();
+    private final RecordSet<RelationshipRecord> relationshipRecords = new RecordSet<RelationshipRecord>();
+    private final RecordSet<PropertyRecord> propertyRecords = new RecordSet<PropertyRecord>();
 
     public RecordSet<NodeRecord> getNodeRecords()
     {
